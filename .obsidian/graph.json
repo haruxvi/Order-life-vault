@@ -1,6 +1,6 @@
 {
   "collapse-filter": false,
-  "search": "-path:\"06 Templates\" -path:\"00 Dashboard\" -path:\"07 Notes/Extras\"  -path:\"00 Bandeja\"",
+  "search": "-path:\"06 Plantillas\" -path:\"00 Dashboard\" -path:\"07 Notes/Extras\"  -path:\"00 Bandeja\"",
   "showTags": false,
   "showAttachments": false,
   "hideUnresolved": true,
@@ -8,35 +8,35 @@
   "collapse-color-groups": false,
   "colorGroups": [
     {
-      "query": "path:\"01 Daily\"  ",
+      "query": "path:\"01 Diario\"  ",
       "color": {
         "a": 1,
         "rgb": 12320680
       }
     },
     {
-      "query": "path:\"02 Weekly\"  ",
+      "query": "path:\"02 Semanal\"  ",
       "color": {
         "a": 1,
         "rgb": 1561533
       }
     },
     {
-      "query": "path:\"03 Monthly\"  ",
+      "query": "path:\"03 Mensual\"  ",
       "color": {
         "a": 1,
         "rgb": 49151
       }
     },
     {
-      "query": "path:\"04 Quarterly\"  ",
+      "query": "path:\"04 Trimestral\"  ",
       "color": {
         "a": 1,
         "rgb": 2303
       }
     },
     {
-      "query": "path:\"05 Yearly\"  ",
+      "query": "path:\"05 Anual\"  ",
       "color": {
         "a": 1,
         "rgb": 11403519

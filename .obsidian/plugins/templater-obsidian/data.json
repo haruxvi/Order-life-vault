@@ -1,6 +1,6 @@
 {
   "command_timeout": 5,
-  "templates_folder": "06 Templates",
+  "templates_folder": "06 Plantillas",
   "templates_pairs": [
     [
       "",
@@ -15,47 +15,47 @@
   "enable_folder_templates": true,
   "folder_templates": [
     {
-      "folder": "01 Daily",
-      "template": "06 Templates/Plantillas/Diaria.md"
+      "folder": "01 Diario",
+      "template": "06 Plantillas/Periódicas/Diaria.md"
     },
     {
-      "folder": "02 Weekly",
-      "template": "06 Templates/Plantillas/Semanal.md"
+      "folder": "02 Semanal",
+      "template": "06 Plantillas/Periódicas/Semanal.md"
     },
     {
-      "folder": "03 Monthly",
-      "template": "06 Templates/Plantillas/Mensual.md"
+      "folder": "03 Mensual",
+      "template": "06 Plantillas/Periódicas/Mensual.md"
     },
     {
-      "folder": "04 Quarterly",
-      "template": "06 Templates/Plantillas/Trimestral.md"
+      "folder": "04 Trimestral",
+      "template": "06 Plantillas/Periódicas/Trimestral.md"
     },
     {
-      "folder": "05 Yearly",
-      "template": "06 Templates/Plantillas/Anual.md"
+      "folder": "05 Anual",
+      "template": "06 Plantillas/Periódicas/Anual.md"
     }
   ],
   "enable_file_templates": false,
   "file_templates": [
     {
-      "regex": ".*/01 Daily/.*$",
-      "template": "06 Templates/Plantillas/Diaria.md"
+      "regex": ".*/01 Diario/.*$",
+      "template": "06 Plantillas/Periódicas/Diaria.md"
     },
     {
-      "regex": ".*/02 Weekly/.*$",
-      "template": "06 Templates/Plantillas/Semanal.md"
+      "regex": ".*/02 Semanal/.*$",
+      "template": "06 Plantillas/Periódicas/Semanal.md"
     },
     {
-      "regex": ".*/03 Monthly/.*$",
-      "template": "06 Templates/Plantillas/Mensual.md"
+      "regex": ".*/03 Mensual/.*$",
+      "template": "06 Plantillas/Periódicas/Mensual.md"
     },
     {
-      "regex": ".*/04 Quarterly/.*$",
-      "template": "06 Templates/Plantillas/Trimestral.md"
+      "regex": ".*/04 Trimestral/.*$",
+      "template": "06 Plantillas/Periódicas/Trimestral.md"
     },
     {
-      "regex": ".*/05 Yearly/.*$",
-      "template": "06 Templates/Plantillas/Anual.md"
+      "regex": ".*/05 Anual/.*$",
+      "template": "06 Plantillas/Periódicas/Anual.md"
     }
   ],
   "syntax_highlighting": true,

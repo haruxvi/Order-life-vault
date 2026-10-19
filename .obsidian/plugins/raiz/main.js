@@ -7,9 +7,52 @@
  */
 const { Plugin, PluginSettingTab, Setting, Notice, Modal, FuzzySuggestModal, ItemView, MarkdownRenderer, MarkdownView, Menu, setIcon, getIconIds, getAllTags, requestUrl, TFile, moment } = require('obsidian');
 
+// ───────────────────────────── Proveedores de IA ─────────────────────────────
+// kind "openai" = API compatible con OpenAI (/chat/completions). Los modelos son solo sugerencias:
+// en los ajustes, "Cargar modelos" trae la lista real de cada proveedor.
+const AI_PROVIDERS = {
+  ollama: { label: 'Ollama (local, en tu PC)', kind: 'ollama', local: true },
+  lmstudio: { label: 'LM Studio (local)', kind: 'openai', local: true, baseUrl: 'http://127.0.0.1:1234/v1', hint: 'Abre LM Studio, carga un modelo y activa el servidor local (Developer → Start server).' },
+  openai: { label: 'OpenAI (ChatGPT, GPT)', kind: 'openai', baseUrl: 'https://api.openai.com/v1', needsKey: true, json: true, fast: 'gpt-4.1-mini', deep: 'gpt-4.1', embed: 'text-embedding-3-small', keyUrl: 'https://platform.openai.com/api-keys', hint: 'La suscripción de ChatGPT (Plus, Codex) no incluye la API: necesitas una API key de platform.openai.com, que se cobra aparte por uso.' },
+  anthropic: { label: 'Anthropic (Claude)', kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', needsKey: true, fast: 'claude-haiku-5-5', deep: 'claude-sonnet-5-5', keyUrl: 'https://console.anthropic.com/settings/keys', hint: 'La suscripción de Claude (Pro, Max) no incluye la API: necesitas una API key de la consola de Anthropic, que se cobra por uso.' },
+  xai: { label: 'xAI (Grok)', kind: 'openai', baseUrl: 'https://api.x.ai/v1', needsKey: true, json: true, keyUrl: 'https://console.x.ai', hint: 'Usa "Cargar modelos" para elegir entre los Grok disponibles en tu cuenta.' },
+  deepseek: { label: 'DeepSeek', kind: 'openai', baseUrl: 'https://api.deepseek.com/v1', needsKey: true, json: true, fast: 'deepseek-chat', deep: 'deepseek-chat', keyUrl: 'https://platform.deepseek.com/api_keys' },
+  kimi: { label: 'Kimi (Moonshot AI)', kind: 'openai', baseUrl: 'https://api.moonshot.ai/v1', needsKey: true, json: true, keyUrl: 'https://platform.moonshot.ai/console/api-keys', hint: 'Usa "Cargar modelos" para elegir un modelo Kimi.' },
+  qwen: { label: 'Qwen (Alibaba Cloud)', kind: 'openai', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', needsKey: true, json: true, fast: 'qwen-plus', deep: 'qwen-max', keyUrl: 'https://modelstudio.console.alibabacloud.com/' },
+  gemini: { label: 'Google Gemini', kind: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', needsKey: true, json: true, fast: 'gemini-2.5-flash', deep: 'gemini-2.5-pro', keyUrl: 'https://aistudio.google.com/apikey' },
+  openrouter: { label: 'OpenRouter (cientos de modelos con una sola key)', kind: 'openai', baseUrl: 'https://openrouter.ai/api/v1', needsKey: true, keyUrl: 'https://openrouter.ai/keys', hint: 'Con una sola key usas modelos de OpenAI, Anthropic, Google, xAI, DeepSeek, Qwen, Kimi y más.' },
+  groq: { label: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, json: true, fast: 'llama-3.3-70b-versatile', deep: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
+  opencode: { label: 'OpenCode Zen', kind: 'openai', baseUrl: 'https://opencode.ai/zen/v1', needsKey: true, keyUrl: 'https://opencode.ai/zen', hint: 'Usa tu API key de OpenCode Zen y "Cargar modelos" para elegir el modelo.' },
+  openclaw: { label: 'OpenClaw (tu agente personal)', kind: 'openai', local: true, baseUrl: 'http://127.0.0.1:18789/v1', fast: 'openclaw:main', deep: 'openclaw:main', hint: 'Activa en OpenClaw gateway.http.endpoints.chatCompletions.enabled. El modelo es openclaw:<id del agente> (ej. openclaw:main), y en "API key" va el token del gateway si lo usas. Revisa el puerto de tu gateway.' },
+  custom: { label: 'Otro (cualquier API compatible con OpenAI)', kind: 'openai', baseUrl: '', hint: 'Sirve para vLLM, llama.cpp, Jan, LocalAI, LiteLLM, Azure, Mistral, Together, Fireworks, agentes con API propia… Pon la URL base que termina en /v1.' },
+};
+
+// ───────────────────────────── Tipografías ─────────────────────────────
+// "g" = familia de Google Fonts (se descarga al elegirla); "css" = la pila de fuentes con respaldo del sistema.
+const FONT_PRESETS = {
+  '': { label: 'Raíz (Inter y Space Grotesk)' },
+  garamond: { label: 'Libro clásico · EB Garamond', css: '"EB Garamond", Garamond, Georgia, serif', g: 'EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400' },
+  cormorant: { label: 'Elegante · Cormorant Garamond', css: '"Cormorant Garamond", Garamond, Georgia, serif', g: 'Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400' },
+  lora: { label: 'Lectura cómoda · Lora', css: 'Lora, Georgia, serif', g: 'Lora:ital,wght@0,400;0,500;0,600;0,700;1,400' },
+  playfair: { label: 'Editorial · Playfair Display', css: '"Playfair Display", Georgia, serif', g: 'Playfair+Display:ital,wght@0,400;0,600;0,700;1,400' },
+  merriweather: { label: 'Periódico · Merriweather', css: 'Merriweather, Georgia, serif', g: 'Merriweather:ital,wght@0,400;0,700;1,400' },
+  georgia: { label: 'Georgia (del sistema)', css: 'Georgia, "Times New Roman", serif' },
+  palatino: { label: 'Palatino (del sistema)', css: '"Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif' },
+  inter: { label: 'Moderna · Inter', css: 'Inter, "Segoe UI", system-ui, sans-serif', g: 'Inter:wght@400;500;600;700' },
+  grotesk: { label: 'Geométrica · Space Grotesk', css: '"Space Grotesk", Inter, system-ui, sans-serif', g: 'Space+Grotesk:wght@400;500;600;700' },
+  nunito: { label: 'Redondeada · Nunito', css: 'Nunito, "Segoe UI", sans-serif', g: 'Nunito:ital,wght@0,400;0,600;0,700;1,400' },
+  sistema: { label: 'La del sistema (Segoe UI, San Francisco…)', css: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+  mono: { label: 'Monoespaciada · JetBrains Mono', css: '"JetBrains Mono", Consolas, monospace', g: 'JetBrains+Mono:wght@400;600' },
+  caveat: { label: 'Escrita a mano · Caveat', css: 'Caveat, "Segoe Print", cursive', g: 'Caveat:wght@400;600;700' },
+  custom: { label: 'Otra instalada en tu PC (escribe el nombre)' },
+};
+
 // ───────────────────────────── Configuración por defecto ─────────────────────────────
 
 const DEFAULT_SETTINGS = {
+  // Proveedor de IA: 'ollama' (local) o cualquiera de AI_PROVIDERS. Las API keys NO van aquí (se guardan por dispositivo).
+  ai: { provider: 'ollama', providers: {}, embedVia: 'ollama' },
+  fonts: { text: '', headings: '', ui: '' },
   ollamaUrl: 'http://127.0.0.1:11434',
   modelMode: 'auto', // auto: elige según la RAM del equipo · manual: usa siempre los de abajo
   fastModel: 'qwen2.5:3b',
@@ -72,19 +115,19 @@ const DEFAULT_SETTINGS = {
     { key: 'pantallas', label: '📵 Sin pantallas antes de dormir' },
   ],
   folders: {
-    daily: '01 Daily',
-    weekly: '02 Weekly',
-    monthly: '03 Monthly',
-    quarterly: '04 Quarterly',
-    yearly: '05 Yearly',
-    templates: '06 Templates/Raiz',
+    daily: '01 Diario',
+    weekly: '02 Semanal',
+    monthly: '03 Mensual',
+    quarterly: '04 Trimestral',
+    yearly: '05 Anual',
+    templates: '06 Plantillas/Raiz',
     academic: '08 Académico',
     training: '09 Entrenamiento',
     agenda: '10 Agenda',
     library: '11 Biblioteca',
-    banners: '06 Templates/Banners',
+    banners: '06 Plantillas/Banners',
     dashboard: '00 Dashboard',
-    covers: '06 Templates/Portadas',
+    covers: '06 Plantillas/Portadas',
     knowledge: '12 Conocimiento',
     inbox: '00 Bandeja',
   },
@@ -1003,10 +1046,11 @@ module.exports = class RaizPlugin extends Plugin {
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass('raiz-status');
     this.statusEl.setText('✦ IA…');
-    this.statusEl.onClickEvent(() => this.checkOllama(true));
+    this.statusEl.onClickEvent(() => this.checkAI(true));
+    this.loadUserFonts().then(() => this.applyFonts());
 
     this.addCommand({ id: 'open-settings', name: 'Abrir ajustes', callback: () => this.openSettings() });
-    this.addCommand({ id: 'check-ollama', name: 'Comprobar IA local (Ollama)', callback: () => this.checkOllama(true) });
+    this.addCommand({ id: 'check-ollama', name: 'Comprobar la IA', callback: () => this.checkAI(true) });
     this.addCommand({ id: 'pull-models', name: 'Descargar modelos de IA recomendados', callback: () => this.pullModels() });
     this.addCommand({ id: 'open-today', name: 'Abrir la nota de hoy', callback: () => this.openToday() });
     this.addCommand({ id: 'new-course', name: 'Nueva asignatura', callback: () => this.newCourse() });
@@ -1077,14 +1121,16 @@ module.exports = class RaizPlugin extends Plugin {
     this.app.workspace.onLayoutReady(async () => {
       this.layoutReadyAt = Date.now();
       this.registerEvent(this.app.vault.on('create', (f) => this.onLinkedNoteCreated(f).catch((e) => console.error('[Raíz]', e))));
-      const st = await this.checkOllama(false);
-      // Indexado en segundo plano para las conexiones (solo si el modelo de embeddings está instalado)
-      const hasEmbed = st.ok && st.installed.some((m) => m.replace(/:latest$/, '') === this.settings.embedModel.replace(/:latest$/, ''));
+      if (this.aiId() !== 'ollama') this.checkAI(false);
+      const st = this.embedUsesProvider() ? { ok: true, installed: [] } : await this.checkOllama(false);
+      // Indexado en segundo plano para las conexiones (solo si el modelo de embeddings está disponible)
+      const hasEmbed = this.embedUsesProvider() || (st.ok && st.installed.some((m) => m.replace(/:latest$/, '') === this.settings.embedModel.replace(/:latest$/, '')));
       if (this.settings.autoIndex && hasEmbed) setTimeout(() => this.indexVault(true).catch(() => {}), 20000);
     });
   }
 
   onunload() {
+    this.clearFonts();
     this.stopRest();
     if (window.raiz === this.api) delete window.raiz;
   }
@@ -1120,7 +1166,7 @@ module.exports = class RaizPlugin extends Plugin {
       },
       ai: {
         chat: (o) => p.chat(o),
-        check: () => p.checkOllama(true),
+        check: () => p.checkAI(true),
       },
       build: (tp) => p.buildFromTp(tp),
       training: {
@@ -1150,6 +1196,229 @@ module.exports = class RaizPlugin extends Plugin {
     }
   }
 
+  // ───────────── Proveedores de IA: local (Ollama, LM Studio…) o en la nube (OpenAI, Claude, DeepSeek…) ─────────────
+  aiProviders() {
+    return AI_PROVIDERS;
+  }
+  aiId() {
+    const id = this.settings.ai?.provider || 'ollama';
+    return AI_PROVIDERS[id] ? id : 'ollama';
+  }
+  aiConf(id = this.aiId()) {
+    const preset = AI_PROVIDERS[id];
+    const own = this.settings.ai?.providers?.[id] || {};
+    const set = Object.fromEntries(Object.entries(own).filter(([, v]) => v !== '' && v !== null && v !== undefined));
+    return { ...preset, ...set, baseUrl: String(set.baseUrl || preset.baseUrl || '').replace(/\/+$/, '') };
+  }
+  isLocalAI() {
+    return this.aiId() === 'ollama' || !!AI_PROVIDERS[this.aiId()].local;
+  }
+  /** Las API keys van al Llavero cifrado de Obsidian (o, si no existe, al almacenamiento local): nunca al vault ni a git. */
+  apiKey(id = this.aiId()) {
+    try {
+      const ss = this.app.secretStorage;
+      if (ss?.getSecret) return ss.getSecret(`raiz-${id}`) || '';
+      return this.app.loadLocalStorage(`raiz-key-${id}`) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+  setApiKey(id, v) {
+    v = v ? v.trim() : '';
+    try {
+      const ss = this.app.secretStorage;
+      if (ss?.setSecret) {
+        if (v) ss.setSecret(`raiz-${id}`, v);
+        else ss.deleteSecret?.(`raiz-${id}`);
+      } else this.app.saveLocalStorage(`raiz-key-${id}`, v || null);
+    } catch (e) {
+      new Notice(`No pude guardar la key: ${e.message}`);
+    }
+  }
+  aiHeaders(c, id) {
+    const key = this.apiKey(id);
+    if (c.kind === 'anthropic') return { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+    const h = key ? { Authorization: `Bearer ${key}` } : {};
+    if (id === 'openrouter') Object.assign(h, { 'HTTP-Referer': 'https://obsidian.md', 'X-Title': 'Raiz' });
+    return h;
+  }
+  async aiRequest(url, { method = 'POST', body, headers = {} } = {}) {
+    const req = requestUrl({ url, method, contentType: 'application/json', headers, body: body ? JSON.stringify(body) : undefined, throw: false });
+    const limit = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 300000));
+    try {
+      return await Promise.race([req, limit]);
+    } catch (e) {
+      if (e.message === 'timeout') throw new Error('La IA tardó más de 5 minutos. Intenta de nuevo o usa un modelo más liviano.');
+      throw new Error(`No pude conectar con ${new URL(url).host}. Revisa la URL y tu conexión.`);
+    }
+  }
+  aiError(res) {
+    let msg = '';
+    try {
+      const j = res.json;
+      msg = j?.error?.message || j?.error || j?.message || '';
+    } catch (e) {
+      /* no es json */
+    }
+    msg = String(msg || res.text || res.status).slice(0, 300);
+    if (res.status === 401 || res.status === 403) return `La API key no es válida o no tiene permiso (${res.status}). Revísala en Ajustes → Raíz → IA.`;
+    if (res.status === 429) return `El proveedor dice que llegaste al límite o que no queda saldo (429): ${msg}`;
+    return msg;
+  }
+  /** Chat con un proveedor externo (formato OpenAI o Claude). */
+  async chatRemote({ system, prompt, schema, temperature, maxTokens, model }) {
+    const id = this.aiId();
+    const c = this.aiConf(id);
+    if (!c.baseUrl) throw new Error('Falta la URL del proveedor de IA (Ajustes → Raíz → IA).');
+    if (c.needsKey && !this.apiKey(id)) throw new Error(`Falta tu API key de ${c.label} (Ajustes → Raíz → IA).`);
+    const sys = (system || this.systemPrompt()) + (schema ? `\nResponde SOLO con un objeto JSON válido (sin texto alrededor ni bloques de código) que siga este esquema: ${JSON.stringify(schema)}` : '');
+    const max = maxTokens || (schema ? 900 : 1500);
+    if (c.kind === 'anthropic') {
+      const res = await this.aiRequest(`${c.baseUrl}/messages`, { headers: this.aiHeaders(c, id), body: { model, system: sys, max_tokens: max, temperature, messages: [{ role: 'user', content: prompt }] } });
+      if (res.status >= 400) throw new Error(`${c.label}: ${this.aiError(res)}`);
+      return (res.json?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+    }
+    // Formato OpenAI (OpenAI, DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq, LM Studio…)
+    const body = { model, messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], temperature, max_tokens: max };
+    if (schema && c.json) body.response_format = { type: 'json_object' };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await this.aiRequest(`${c.baseUrl}/chat/completions`, { headers: this.aiHeaders(c, id), body });
+      if (res.status < 400) {
+        const m = res.json?.choices?.[0]?.message;
+        return String(m?.content ?? '');
+      }
+      const msg = this.aiError(res);
+      // Algunos modelos (los que razonan) no aceptan temperature o piden max_completion_tokens
+      if (/max_tokens/i.test(msg) && body.max_tokens) ((body.max_completion_tokens = Math.max(body.max_tokens, 4000)), delete body.max_tokens);
+      else if (/temperature/i.test(msg) && 'temperature' in body) delete body.temperature;
+      else if (/response_format|json_object/i.test(msg) && body.response_format) delete body.response_format;
+      else throw new Error(`${c.label}: ${msg}`);
+    }
+    throw new Error(`${c.label} rechazó la petición.`);
+  }
+  /** Lista de modelos del proveedor elegido (para elegirlos en los ajustes). */
+  async listModels(id = this.aiId()) {
+    const c = this.aiConf(id);
+    if (id === 'ollama') {
+      const res = await this.aiRequest(`${this.ollamaUrl()}/api/tags`, { method: 'GET' });
+      if (res.status >= 400) throw new Error(this.aiError(res));
+      return (res.json.models || []).map((m) => m.name).sort();
+    }
+    const res = await this.aiRequest(`${c.baseUrl}/models`, { method: 'GET', headers: this.aiHeaders(c, id) });
+    if (res.status >= 400) throw new Error(`${c.label}: ${this.aiError(res)}`);
+    return (res.json?.data || res.json?.models || []).map((m) => String(m.id || m.name || '').replace(/^models\//, '')).filter(Boolean).sort();
+  }
+  /** Comprueba la IA elegida y actualiza la barra de estado. */
+  async checkAI(verbose) {
+    if (this.aiId() === 'ollama') return this.checkOllama(verbose);
+    const c = this.aiConf();
+    try {
+      if (c.needsKey && !this.apiKey()) throw new Error('falta la API key');
+      const models = await this.listModels();
+      const fast = this.modelFor('fast');
+      const known = !models.length || models.includes(fast);
+      this.statusEl?.setText(`✦ IA lista · ${fast}`);
+      if (verbose) new Notice(`✅ ${c.label} responde.\nRápido: ${fast}\nProfundo: ${this.modelFor('deep')}${known ? '' : `\n⚠️ No veo "${fast}" en su lista de modelos: revisa el nombre.`}`, 8000);
+      return { ok: true, installed: models, missing: [] };
+    } catch (e) {
+      this.statusEl?.setText('✦ IA sin conexión');
+      if (verbose) new Notice(`${c.label}: ${e.message}`, 10000);
+      return { ok: false, installed: [], missing: [] };
+    }
+  }
+  embedUsesProvider() {
+    const c = this.aiConf();
+    return this.settings.ai?.embedVia === 'provider' && this.aiId() !== 'ollama' && c.kind === 'openai' && !!c.embed;
+  }
+  /** Identificador del índice de notas: si cambia el modelo de embeddings, se reindexa. */
+  embedModelId() {
+    return this.embedUsesProvider() ? `${this.aiId()}:${this.aiConf().embed}` : this.settings.embedModel;
+  }
+  // ───────────── Tipografía: fuentes para el texto, los títulos y la interfaz ─────────────
+  fontOptions() {
+    const opts = Object.entries(FONT_PRESETS).map(([v, f]) => [v, f.label]);
+    for (const n of this.userFonts || []) opts.splice(opts.length - 1, 0, [`file:${n}`, `Tu fuente · ${n}`]);
+    return opts;
+  }
+  fontCss(slot) {
+    const f = this.settings.fonts || {};
+    const v = f[slot] || '';
+    if (!v) return null;
+    if (v === 'custom') return f[`${slot}Custom`] ? `"${String(f[`${slot}Custom`]).replace(/"/g, '')}", system-ui, sans-serif` : null;
+    if (v.startsWith('file:')) return `"${v.slice(5)}", system-ui, sans-serif`;
+    return FONT_PRESETS[v]?.css || null;
+  }
+  applyFonts() {
+    const f = this.settings.fonts || {};
+    const vars = { text: '--font-text-theme', headings: '--raiz-display', ui: '--font-interface-theme' };
+    const google = [];
+    for (const [slot, prop] of Object.entries(vars)) {
+      const css = this.fontCss(slot);
+      if (css) document.body.style.setProperty(prop, css);
+      else document.body.style.removeProperty(prop);
+      const g = FONT_PRESETS[f[slot]]?.g;
+      if (g) google.push(g);
+    }
+    let link = document.getElementById('raiz-fonts-link');
+    if (google.length) {
+      if (!link) link = document.head.createEl('link', { attr: { id: 'raiz-fonts-link', rel: 'stylesheet' } });
+      const href = 'https://fonts.googleapis.com/css2?' + [...new Set(google)].map((g) => `family=${g}`).join('&') + '&display=swap';
+      if (link.getAttribute('href') !== href) link.setAttribute('href', href);
+    } else link?.remove();
+  }
+  clearFonts() {
+    for (const prop of ['--font-text-theme', '--raiz-display', '--font-interface-theme']) document.body.style.removeProperty(prop);
+    document.getElementById('raiz-fonts-link')?.remove();
+    for (const ff of this.fontFaces || []) document.fonts.delete(ff);
+    this.fontFaces = [];
+  }
+  fontDir() {
+    return `${this.manifest.dir}/fuentes`;
+  }
+  /** Fuentes que agregaste desde tu PC (quedan en la carpeta del plugin, no se suben a GitHub). */
+  async loadUserFonts() {
+    for (const ff of this.fontFaces || []) document.fonts.delete(ff);
+    this.fontFaces = [];
+    this.userFonts = [];
+    const a = this.app.vault.adapter;
+    if (!(await a.exists(this.fontDir()))) return;
+    for (const path of (await a.list(this.fontDir())).files) {
+      const m = path.match(/([^/\\]+)\.(ttf|otf|woff2?)$/i);
+      if (!m) continue;
+      try {
+        const ff = new FontFace(m[1], await a.readBinary(path));
+        await ff.load();
+        document.fonts.add(ff);
+        this.fontFaces.push(ff);
+        this.userFonts.push(m[1]);
+      } catch (e) {
+        console.warn('[Raíz] No pude cargar la fuente', path, e);
+      }
+    }
+  }
+  pickFont(after) {
+    const inp = createEl('input', { attr: { type: 'file', accept: '.ttf,.otf,.woff,.woff2' } });
+    inp.addEventListener('change', () =>
+      this.run(async () => {
+        const file = inp.files?.[0];
+        if (!file) return;
+        const a = this.app.vault.adapter;
+        if (!(await a.exists(this.fontDir()))) await a.mkdir(this.fontDir());
+        await a.writeBinary(`${this.fontDir()}/${file.name}`, await file.arrayBuffer());
+        await this.loadUserFonts();
+        new Notice(`Fuente agregada: ${file.name.replace(/\.[^.]+$/, '')}. Elígela en Tipografía.`);
+        after?.();
+      })
+    );
+    inp.click();
+  }
+  /** Prueba rápida del proveedor de IA elegido. */
+  async testAI() {
+    const r = await this.chat({ prompt: 'Responde solo con la palabra: listo', tier: 'fast', maxTokens: 30, temperature: 0, label: 'Probando la IA' });
+    await this.checkAI(false);
+    new Notice(`✅ ${this.aiConf().label} respondió: "${String(r).trim().slice(0, 60)}"\nModelo: ${this.modelFor('fast')}`, 8000);
+  }
+
   // ───────────── Ollama ─────────────
   ollamaUrl() {
     let url = this.settings.ollamaUrl;
@@ -1174,6 +1443,10 @@ module.exports = class RaizPlugin extends Plugin {
   }
   modelFor(tier) {
     const s = this.settings;
+    if (this.aiId() !== 'ollama') {
+      const c = this.aiConf();
+      return tier === 'deep' ? c.deep || c.fast || '' : c.fast || c.deep || '';
+    }
     if (tier !== 'deep') return s.fastModel;
     if (s.modelMode === 'manual') return s.deepModel;
     const ram = this.totalRamGB();
@@ -1185,6 +1458,17 @@ module.exports = class RaizPlugin extends Plugin {
 
   async chat({ system, prompt, tier = 'fast', schema = null, temperature = 0.5, label = 'Pensando', maxTokens }) {
     const model = this.modelFor(tier);
+    if (this.aiId() !== 'ollama') {
+      if (!model) throw new Error(`Elige un modelo para ${this.aiConf().label} en Ajustes → Raíz → Inteligencia artificial.`);
+      const n = new Notice(`✦ ${label} · ${model}…`, 0);
+      try {
+        const content = cleanResponse(await this.chatRemote({ system, prompt, schema, temperature, maxTokens, model }));
+        if (!content) throw new Error('El modelo respondió vacío. Intenta de nuevo.');
+        return schema ? parseJson(content) : content;
+      } finally {
+        n.hide();
+      }
+    }
     const base = this.ollamaUrl();
     const notice = new Notice(`✦ ${label} · ${model}…`, 0);
     try {
@@ -1236,6 +1520,8 @@ module.exports = class RaizPlugin extends Plugin {
       const installed = (res.json.models || []).map((m) => m.name);
       const has = (m) => installed.some((i) => i === m || i === `${m}:latest` || i.replace(/:latest$/, '') === m);
       const missing = this.neededModels().filter((m) => !has(m));
+      const mine = this.aiId() === 'ollama';
+      if (!mine) return { ok: true, installed, missing };
       if (missing.length) {
         this.statusEl?.setText('✦ IA: faltan modelos');
         if (verbose) new Notice(`Ollama está activo, pero faltan modelos: ${missing.join(', ')}.\nUsa "Raíz: Descargar modelos de IA recomendados".`, 10000);
@@ -1245,7 +1531,7 @@ module.exports = class RaizPlugin extends Plugin {
       }
       return { ok: true, installed, missing };
     } catch (e) {
-      this.statusEl?.setText('✦ IA apagada');
+      if (this.aiId() === 'ollama') this.statusEl?.setText('✦ IA apagada');
       if (verbose) new Notice(`No encuentro Ollama en ${base}.\nInstálalo desde ollama.com y ábrelo.`, 10000);
       return { ok: false, installed: [], missing: this.neededModels() };
     }
@@ -1253,7 +1539,10 @@ module.exports = class RaizPlugin extends Plugin {
 
   async pullModels() {
     const base = this.ollamaUrl();
-    for (const model of [...this.neededModels(), this.settings.embedModel]) {
+    // Con un proveedor externo solo hace falta (si se usa) el modelo local de embeddings
+    const list = this.aiId() === 'ollama' ? [...this.neededModels(), this.settings.embedModel] : this.embedUsesProvider() ? [] : [this.settings.embedModel];
+    if (!list.length) return new Notice('Tu proveedor de IA no necesita descargar modelos.');
+    for (const model of list) {
       const n = new Notice(`⬇️ Descargando ${model}… (puede tardar varios minutos)`, 0);
       try {
         const res = await requestUrl({ url: `${base}/api/pull`, method: 'POST', contentType: 'application/json', body: JSON.stringify({ model, stream: false }), throw: false });
@@ -3941,13 +4230,13 @@ module.exports = class RaizPlugin extends Plugin {
     return `${this.manifest.dir}/vectores.json`;
   }
   async loadVec() {
-    if (this.vec && this.vec.model === this.settings.embedModel) return this.vec;
+    if (this.vec && this.vec.model === this.embedModelId()) return this.vec;
     try {
       this.vec = JSON.parse(await this.app.vault.adapter.read(this.vecPath()));
     } catch (e) {
       this.vec = null;
     }
-    if (!this.vec || this.vec.model !== this.settings.embedModel) this.vec = { model: this.settings.embedModel, items: {} };
+    if (!this.vec || this.vec.model !== this.embedModelId()) this.vec = { model: this.embedModelId(), items: {} };
     return this.vec;
   }
   saveVecSoon() {
@@ -3978,6 +4267,12 @@ module.exports = class RaizPlugin extends Plugin {
     return f;
   }
   async embedTexts(texts, kind = 'document') {
+    if (this.embedUsesProvider()) {
+      const c = this.aiConf();
+      const res = await this.aiRequest(`${c.baseUrl}/embeddings`, { headers: this.aiHeaders(c, this.aiId()), body: { model: c.embed, input: texts } });
+      if (res.status >= 400) throw new Error(`${c.label}: ${this.aiError(res)}`);
+      return (res.json?.data || []).sort((a, b) => a.index - b.index).map((d) => d.embedding);
+    }
     const model = this.settings.embedModel;
     const prefix = /nomic/i.test(model) ? (kind === 'query' ? 'search_query: ' : 'search_document: ') : '';
     let res;
@@ -4067,7 +4362,7 @@ module.exports = class RaizPlugin extends Plugin {
     } finally {
       n?.hide();
       this.indexing = false;
-      this.checkOllama(false);
+      this.checkAI(false);
     }
   }
   async relatedTo(file, k = 8) {
@@ -5527,7 +5822,7 @@ module.exports = class RaizPlugin extends Plugin {
       ['Hoy: agenda, clases, evaluaciones y pendientes', m('dailyToday', '{ date: moment().format("YYYY-MM-DD") }')],
       ['Calendario del mes', m('monthCalendar', '{ month: moment().format("YYYY-MM") }')],
       ['Próximos 60 días (agenda)', m('agenda')],
-      ['Tareas pendientes de todos los días', '```dataview\nTASK\nFROM "01 Daily"\nWHERE !completed AND text != ""\nGROUP BY file.link\n```'],
+      ['Tareas pendientes de todos los días', '```dataview\nTASK\nFROM "01 Diario"\nWHERE !completed AND text != ""\nGROUP BY file.link\n```'],
       ['Biblioteca (galería o tablero)', m('library')],
       ['Biblioteca: solo una categoría (cambia "anime")', m('library', '{ categoria: "anime" }')],
       ['Panel académico (horario y promedios)', m('academicDashboard')],
@@ -5689,7 +5984,7 @@ module.exports = class RaizPlugin extends Plugin {
         (existing ? `\nYa escribí esto en la nota; compleméntalo sin repetirlo:\n${existing}` : '') +
         `\n\n${ctx}`,
     });
-    const warn = `> [!warning]- Borrador de IA local (${this.modelFor('deep')})
+    const warn = `> [!warning]- Borrador de IA (${this.modelFor('deep')})
 > Revisa el código, las fórmulas y los datos antes de estudiarlo: un modelo local puede equivocarse. Reescríbelo con tus palabras para que se te quede.`;
     await this.insertAtCursorOrEnd(file, `${warn}
 
@@ -6068,7 +6363,83 @@ class RaizSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl('h2', { text: 'Raíz' });
 
-    containerEl.createEl('h3', { text: 'IA local (Ollama)' });
+    containerEl.createEl('h3', { text: 'Inteligencia artificial' });
+    s.ai = s.ai || { provider: 'ollama', providers: {}, embedVia: 'ollama' };
+    s.ai.providers = s.ai.providers || {};
+    new Setting(containerEl)
+      .setName('Proveedor')
+      .setDesc('Elige quién responde: un modelo local (tus notas no salen de tu equipo) o uno en la nube (se envía el texto necesario a ese servicio).')
+      .addDropdown((d) => {
+        for (const [id, pv] of Object.entries(AI_PROVIDERS)) d.addOption(id, pv.label);
+        d.setValue(p.aiId()).onChange(async (v) => {
+          s.ai.provider = v;
+          await save();
+          p.checkAI(false);
+          this.display();
+        });
+      });
+    if (p.aiId() !== 'ollama') {
+      const id = p.aiId();
+      const c = p.aiConf(id);
+      const preset = AI_PROVIDERS[id];
+      const own = (s.ai.providers[id] = s.ai.providers[id] || {});
+      if (c.hint) containerEl.createDiv({ cls: 'setting-item-description raiz-ai-hint', text: c.hint });
+      if (!c.local) containerEl.createDiv({ cls: 'raiz-ai-warn', text: `Privacidad: cuando usas la IA, el texto de las notas que analiza se envía a ${c.label}. Con Ollama, LM Studio u OpenClaw en tu PC se queda en tu equipo.` });
+      new Setting(containerEl)
+        .setName('URL base')
+        .setDesc(preset.baseUrl ? `Por defecto: ${preset.baseUrl}` : 'La dirección de la API, normalmente termina en /v1.')
+        .addText((t) => t.setPlaceholder(preset.baseUrl || 'https://…/v1').setValue(own.baseUrl || '').onChange(async (v) => ((own.baseUrl = v.trim()), await save())));
+      const key = new Setting(containerEl).setName('API key').setDesc('Se guarda cifrada en el Llavero de Obsidian, solo en este equipo: no queda en el vault ni se sube a GitHub.');
+      key.addText((t) => {
+        t.inputEl.type = 'password';
+        t.setPlaceholder(c.needsKey ? 'Pega tu key' : 'Opcional').setValue(p.apiKey(id)).onChange((v) => p.setApiKey(id, v));
+      });
+      if (c.keyUrl) key.addButton((b) => b.setButtonText('Conseguir una key').onClick(() => window.open(c.keyUrl)));
+      const listId = `raiz-models-${id}`;
+      const dl = containerEl.createEl('datalist', { attr: { id: listId } });
+      const field = (k, name, desc) =>
+        new Setting(containerEl)
+          .setName(name)
+          .setDesc(desc)
+          .addText((t) => {
+            t.inputEl.setAttr('list', listId);
+            t.setPlaceholder(preset[k] || 'nombre del modelo').setValue(own[k] || '').onChange(async (v) => ((own[k] = v.trim()), await save()));
+          });
+      field('fast', 'Modelo rápido', 'Nota y título del día, etiquetas, textos cortos. Vacío = el sugerido.');
+      field('deep', 'Modelo profundo', 'Resúmenes, Rueda de la Vida, coach, apuntes. Vacío = el mismo que el rápido.');
+      new Setting(containerEl)
+        .setName('Modelos de tu cuenta')
+        .setDesc('Trae la lista real del proveedor para elegir al escribir en los campos de arriba.')
+        .addButton((b) =>
+          b.setButtonText('Cargar modelos').onClick(() =>
+            p.run(async () => {
+              const ms = await p.listModels(id);
+              dl.empty();
+              ms.forEach((m) => dl.createEl('option', { value: m }));
+              new Notice(`${ms.length} modelos disponibles. Escribe en "Modelo rápido" o "Modelo profundo" y elige de la lista.`, 6000);
+            })
+          )
+        )
+        .addButton((b) => b.setButtonText('Probar').setCta().onClick(() => p.run(() => p.testAI())));
+      if (c.kind === 'openai') {
+        new Setting(containerEl)
+          .setName('Notas relacionadas y preguntas al vault')
+          .setDesc('Usan un modelo de "embeddings". Puedes dejarlos en Ollama (local y gratis) aunque el chat sea en la nube. Si lo cambias, reindexa tus notas.')
+          .addDropdown((d) =>
+            d
+              .addOption('ollama', 'Ollama (local)')
+              .addOption('provider', c.label)
+              .setValue(s.ai.embedVia || 'ollama')
+              .onChange(async (v) => ((s.ai.embedVia = v), await save(), this.display()))
+          );
+        if (s.ai.embedVia === 'provider')
+          new Setting(containerEl).setName('Modelo de embeddings del proveedor').addText((t) => t.setPlaceholder(preset.embed || 'ej: text-embedding-3-small').setValue(own.embed || '').onChange(async (v) => ((own.embed = v.trim()), await save())));
+      }
+    }
+
+
+    if (p.aiId() === 'ollama') {
+    containerEl.createEl('h4', { text: 'Ollama' });
     const ram = p.totalRamGB();
     containerEl.createEl('p', {
       cls: 'setting-item-description',
@@ -6112,6 +6483,7 @@ class RaizSettingTab extends PluginSettingTab {
       .setName('Contexto (tokens)')
       .setDesc('Más contexto = lee más notas a la vez, pero usa más RAM. 8192 es buen equilibrio.')
       .addText((t) => t.setValue(String(s.numCtx)).onChange(async (v) => ((s.numCtx = clamp(parseInt(v, 10) || 8192, 2048, 65536)), await save())));
+    }
     new Setting(containerEl)
       .setName('Sobre ti')
       .setDesc('La IA usa esto como contexto. Cuéntale tu situación.')
@@ -6120,6 +6492,36 @@ class RaizSettingTab extends PluginSettingTab {
         t.inputEl.rows = 4;
         t.inputEl.style.width = '100%';
       });
+
+    containerEl.createEl('h3', { text: 'Tipografía' });
+    const fontOpts = p.fontOptions();
+    s.fonts = s.fonts || {};
+    for (const [slot, name, desc] of [
+      ['text', 'Texto', 'Lo que escribes y lees en tus notas.'],
+      ['headings', 'Títulos', 'Encabezados, títulos de página y de los paneles.'],
+      ['ui', 'Interfaz', 'Menús, barra lateral y botones.'],
+    ]) {
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addDropdown((d) => {
+          for (const [v, l] of fontOpts) d.addOption(v, l);
+          d.setValue(s.fonts[slot] || '').onChange(async (v) => ((s.fonts[slot] = v), await save(), p.applyFonts(), this.display()));
+        });
+      if (s.fonts[slot] === 'custom')
+        new Setting(containerEl)
+          .setName(`${name}: nombre de la fuente`)
+          .setDesc('Tal como aparece en tu sistema, ej: Garamond, Book Antiqua, Cascadia Code.')
+          .addText((t) => t.setValue(s.fonts[`${slot}Custom`] || '').onChange(async (v) => ((s.fonts[`${slot}Custom`] = v.trim()), await save(), p.applyFonts())));
+    }
+    const prev = containerEl.createDiv({ cls: 'raiz-font-preview' });
+    prev.createDiv({ cls: 'raiz-font-preview-h', text: 'Aprender es conectar ideas' });
+    prev.createDiv({ cls: 'raiz-font-preview-t', text: 'Cuando el cerebro codifica información busca un lugar donde ponerla. Así se ve tu texto · 0123456789' });
+    new Setting(containerEl)
+      .setName('Fuentes de tu PC')
+      .setDesc(`Agrega archivos .ttf, .otf, .woff o .woff2 y aparecen en las listas de arriba. Se guardan solo en este vault, sin subirse a GitHub. ${(p.userFonts || []).length ? `Tienes: ${p.userFonts.join(', ')}.` : ''}`)
+      .addButton((b) => b.setButtonText('Agregar fuente').onClick(() => p.pickFont(() => this.display())));
+    containerEl.createDiv({ cls: 'setting-item-description', text: 'Las fuentes con nombre (EB Garamond, Lora, Playfair…) se descargan de Google Fonts la primera vez: sin internet se usa una parecida de tu sistema.' });
 
     containerEl.createEl('h3', { text: 'Vida académica' });
     new Setting(containerEl).setName('Semestre actual').setDesc('Ej: 2026-2. Vacío = se calcula por la fecha.').addText((t) => t.setValue(s.semestreActual).onChange(async (v) => ((s.semestreActual = v.trim()), await save())));

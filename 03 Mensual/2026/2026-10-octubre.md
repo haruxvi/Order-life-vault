@@ -1,5 +1,5 @@
 ---
-banner: "[[06 Templates/Banners/banner-mes-2.svg]]"
+banner: "[[banner-mes-2.svg]]"
 banner-y: 50
 banner-height: 320
 content-start: 210
@@ -10,8 +10,8 @@ cssclasses:
   - monthly
 tipo: mensual
 date: 2026-10-01
-alias: 
-pregunta: 
+alias:
+pregunta:
 respuesta: ""
 resumen: ""
 tipoGrafico: line
@@ -27,7 +27,7 @@ class: raiz-btn
 hidden: true
 actions:
   - type: open
-    link: "[[03 Monthly/2026/2026-09-septiembre]]"
+    link: "[[03 Mensual/2026/2026-09-septiembre]]"
     newTab: false
 ```
 ```meta-bind-button
@@ -38,7 +38,7 @@ class: raiz-btn
 hidden: true
 actions:
   - type: open
-    link: "[[04 Quarterly/2026/2026-Q4]]"
+    link: "[[04 Trimestral/2026/2026-Q4]]"
     newTab: false
 ```
 ```meta-bind-button
@@ -49,7 +49,7 @@ class: raiz-btn
 hidden: true
 actions:
   - type: open
-    link: "[[03 Monthly/2026/2026-11-noviembre]]"
+    link: "[[03 Mensual/2026/2026-11-noviembre]]"
     newTab: false
 ```
 

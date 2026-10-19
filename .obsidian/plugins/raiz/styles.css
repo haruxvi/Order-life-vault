@@ -462,3 +462,10 @@
 .raiz-goal-edit-bar { display: flex; justify-content: space-between; gap: 0.6em; }
 .raiz-scope { display: flex; flex-wrap: wrap; gap: 0.4em; margin: 0.2em 0 0.4em; }
 .raiz-bg-title { margin: 1em 0 0.4em; font-size: 0.85em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ── Ajustes: proveedor de IA y tipografía ── */
+.raiz-ai-hint { margin: 0.2em 0 0.6em; }
+.raiz-ai-warn { margin: 0.2em 0 0.8em; padding: 0.6em 0.8em; border-radius: 10px; border: 1px solid rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); color: var(--text-muted); font-size: 0.88em; }
+.raiz-font-preview { margin: 0.4em 0 0.8em; padding: 0.9em 1em; border-radius: 12px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
+.raiz-font-preview-h { font-family: var(--raiz-display); font-size: 1.5em; font-weight: 650; margin-bottom: 0.2em; }
+.raiz-font-preview-t { font-family: var(--font-text); color: var(--text-muted); }

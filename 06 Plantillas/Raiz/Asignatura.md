@@ -86,6 +86,6 @@ if (window.raiz) await window.raiz.charts.moc(dv, this.container); else dv.parag
 ## En mi diario
 ```dataview
 LIST alias
-FROM [[]] AND "01 Daily"
+FROM [[]] AND "01 Diario"
 SORT file.name DESC
 ```

@@ -50,7 +50,7 @@
         "145d20372a951d2e"
       ]
     },
-    "01 Daily": {
+    "01 Diario": {
       "icon": "lucide-sparkle",
       "unsynced": [
         "ad0e91f922f54505",
@@ -58,7 +58,7 @@
         "145d20372a951d2e"
       ]
     },
-    "02 Weekly": {
+    "02 Semanal": {
       "icon": "lucide-stars",
       "unsynced": [
         "51487f92ee3c0ec4",
@@ -71,7 +71,7 @@
         "145d20372a951d2e"
       ]
     },
-    "03 Monthly": {
+    "03 Mensual": {
       "icon": "lucide-star",
       "unsynced": [
         "51487f92ee3c0ec4",
@@ -84,7 +84,7 @@
         "145d20372a951d2e"
       ]
     },
-    "04 Quarterly": {
+    "04 Trimestral": {
       "icon": "lucide-moon-star",
       "unsynced": [
         "51487f92ee3c0ec4",
@@ -97,7 +97,7 @@
         "145d20372a951d2e"
       ]
     },
-    "05 Yearly": {
+    "05 Anual": {
       "icon": "lucide-flower",
       "unsynced": [
         "51487f92ee3c0ec4",

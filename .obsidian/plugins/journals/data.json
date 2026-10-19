@@ -17,9 +17,9 @@
       "confirmCreation": false,
       "nameTemplate": "{{date}}",
       "dateFormat": "YYYY-MM-DD-dddd",
-      "folder": "01 Daily/{{date:YYYY}}/{{date:MM-MMMM}}",
+      "folder": "01 Diario/{{date:YYYY}}/{{date:MM-MMMM}}",
       "templates": [
-        "06 Templates/Plantillas/Diaria.md"
+        "06 Plantillas/Periódicas/Diaria.md"
       ],
       "start": "",
       "end": {
@@ -181,9 +181,9 @@
       "confirmCreation": false,
       "nameTemplate": "{{date}}",
       "dateFormat": "YYYY-MM-MMMM",
-      "folder": "03 Monthly/{{date:YYYY}}",
+      "folder": "03 Mensual/{{date:YYYY}}",
       "templates": [
-        "06 Templates/Plantillas/Mensual.md"
+        "06 Plantillas/Periódicas/Mensual.md"
       ],
       "start": "",
       "end": {
@@ -297,9 +297,9 @@
       "confirmCreation": false,
       "nameTemplate": "{{date}}",
       "dateFormat": "YYYY-[Q]Q",
-      "folder": "04 Quarterly/{{date:YYYY}}",
+      "folder": "04 Trimestral/{{date:YYYY}}",
       "templates": [
-        "06 Templates/Plantillas/Trimestral.md"
+        "06 Plantillas/Periódicas/Trimestral.md"
       ],
       "start": "",
       "end": {
@@ -413,9 +413,9 @@
       "confirmCreation": false,
       "nameTemplate": "{{date}}",
       "dateFormat": "YYYY-[W]ww",
-      "folder": "02 Weekly/{{date:YYYY}}",
+      "folder": "02 Semanal/{{date:YYYY}}",
       "templates": [
-        "06 Templates/Plantillas/Semanal.md"
+        "06 Plantillas/Periódicas/Semanal.md"
       ],
       "start": "",
       "end": {
@@ -545,9 +545,9 @@
       "confirmCreation": false,
       "nameTemplate": "{{date}}",
       "dateFormat": "YYYY",
-      "folder": "05 Yearly",
+      "folder": "05 Anual",
       "templates": [
-        "06 Templates/Plantillas/Anual.md"
+        "06 Plantillas/Periódicas/Anual.md"
       ],
       "start": "",
       "end": {

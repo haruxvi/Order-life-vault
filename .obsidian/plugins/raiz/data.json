@@ -1,4 +1,14 @@
 {
+  "ai": {
+    "provider": "ollama",
+    "providers": {},
+    "embedVia": "ollama"
+  },
+  "fonts": {
+    "text": "",
+    "headings": "",
+    "ui": ""
+  },
   "ollamaUrl": "http://127.0.0.1:11434",
   "modelMode": "auto",
   "fastModel": "qwen2.5:3b",
@@ -320,19 +330,19 @@
     }
   ],
   "folders": {
-    "daily": "01 Daily",
-    "weekly": "02 Weekly",
-    "monthly": "03 Monthly",
-    "quarterly": "04 Quarterly",
-    "yearly": "05 Yearly",
-    "templates": "06 Templates/Raiz",
+    "daily": "01 Diario",
+    "weekly": "02 Semanal",
+    "monthly": "03 Mensual",
+    "quarterly": "04 Trimestral",
+    "yearly": "05 Anual",
+    "templates": "06 Plantillas/Raiz",
     "academic": "08 Académico",
     "training": "09 Entrenamiento",
     "agenda": "10 Agenda",
     "library": "11 Biblioteca",
-    "banners": "06 Templates/Banners",
+    "banners": "06 Plantillas/Banners",
     "dashboard": "00 Dashboard",
-    "covers": "06 Templates/Portadas",
+    "covers": "06 Plantillas/Portadas",
     "knowledge": "12 Conocimiento",
     "inbox": "00 Bandeja"
   }

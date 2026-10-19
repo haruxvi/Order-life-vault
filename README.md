@@ -20,7 +20,12 @@ Todo lo hace el plugin propio **Raíz** (`.obsidian/plugins/raiz`).
 
 ### Requisitos
 1. [Obsidian](https://obsidian.md) 1.4 o superior. Activa los plugins de la comunidad al abrir el vault.
-2. Para la IA: [Ollama](https://ollama.com). Después, en Obsidian: `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados**.
+2. Para la IA, elige en **Ajustes → Raíz → Inteligencia artificial**:
+   - **Local**: [Ollama](https://ollama.com) (luego `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados**), LM Studio u OpenClaw.
+   - **En la nube, con tu API key**: OpenAI (GPT), Anthropic (Claude), xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq u OpenCode Zen.
+   - **Cualquier otra API compatible con OpenAI.**
+
+   Las keys se guardan en el Llavero de Obsidian, nunca en el vault.
 3. Instala desde la tienda de Obsidian los plugins no incluidos (ver [TERCEROS.md](TERCEROS.md)).
 
 La guía completa está en [00 Dashboard/Guía Raíz.md](00%20Dashboard/Guía%20Raíz.md).
@@ -46,7 +51,12 @@ All of it is handled by my own plugin, **Raíz** (`.obsidian/plugins/raiz`).
 
 ### Requirements
 1. [Obsidian](https://obsidian.md) 1.4 or later. Enable community plugins when you open the vault.
-2. For the AI: [Ollama](https://ollama.com). Then in Obsidian: `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados** (download recommended AI models).
+2. For the AI, pick a provider in **Settings → Raíz → Inteligencia artificial**:
+   - **Local**: [Ollama](https://ollama.com) (then `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados**), LM Studio or OpenClaw.
+   - **Cloud, with your own API key**: OpenAI (GPT), Anthropic (Claude), xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq or OpenCode Zen.
+   - **Any other OpenAI-compatible API.**
+
+   Keys are stored in Obsidian's keychain, never inside the vault.
 3. Install the plugins that are not bundled from the Obsidian community store (see [THIRD_PARTY.md](THIRD_PARTY.md)).
 
 ### Third-party software notice

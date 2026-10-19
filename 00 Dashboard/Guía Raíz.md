@@ -4,9 +4,22 @@ cssclasses:
 ---
 # Guía de Raíz
 
-Raíz es el motor propio de este vault: **IA 100 % local e ilimitada** (con Ollama, sin API key ni licencia), entrenamiento, vida académica, agenda, hábitos y gráficos. Todo vive en tus archivos.
+Raíz es el motor propio de este vault: **IA a tu elección** (local e ilimitada con Ollama, o el proveedor que quieras), entrenamiento, vida académica, agenda, hábitos y gráficos. Todo vive en tus archivos.
 
 ## 1. Activar la IA (una vez por equipo)
+En **Ajustes → Raíz → Inteligencia artificial** eliges quién responde:
+- **Local, gratis y privado**: Ollama (lo que sigue más abajo), LM Studio u OpenClaw, tu agente personal.
+- **En la nube, con tu API key**: OpenAI (GPT), Anthropic (Claude), xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq u OpenCode Zen.
+- **Otro**: cualquier servicio, bot o agente con API compatible con OpenAI. Pegas su URL y su key.
+
+Para cada proveedor puedes:
+- Elegir un modelo rápido y uno profundo. **Cargar modelos** trae la lista real de tu cuenta.
+- Usar **Probar** para comprobar que responde.
+- Guardar la API key en el **Llavero** de Obsidian: queda cifrada en tu equipo y nunca en el vault ni en GitHub.
+
+Ojo con las suscripciones: ChatGPT Plus/Codex y Claude Pro/Max **no** incluyen la API, así que necesitas una key de pago por uso. Con un proveedor en la nube, el texto que la IA analiza se envía a ese servicio. Las notas relacionadas pueden seguir usando Ollama en local.
+
+### Con Ollama
 1. Ollama ya está instalado y corriendo en este PC. En otro equipo, instálalo desde **ollama.com**.
 2. En Obsidian: `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados**.
 3. La barra inferior debe decir **✦ IA lista**. Si no, haz clic en ella para volver a comprobar.
@@ -82,7 +95,7 @@ Todo vive en `08 Académico/Estudio`.
 - Cada página tiene:
   - Migas de pan.
   - Un **ícono** que eliges al hacer clic.
-  - **Portada**: imágenes tuyas de `06 Templates/Portadas`, una URL o una al azar.
+  - **Portada**: imágenes tuyas de `06 Plantillas/Portadas`, una URL o una al azar.
   - **Importancia** de 1 a 5 estrellas.
   - Una tabla con sus subpáginas, con las vistas *Todas las notas*, *Por número de clase*, *Tarjetas* y *Lista simple*.
 - Esas tablas son **Bases** de Obsidian: puedes editar celdas, ordenar, filtrar, agrupar y crear tus propias vistas, igual que en Notion.
@@ -193,6 +206,14 @@ En **Ajustes → Raíz** puedes cambiar:
 
 Los cambios aplican a las notas nuevas.
 
+### Tipografía
+En **Ajustes → Raíz → Tipografía** eliges la fuente del **texto**, de los **títulos** y de la **interfaz**:
+- **Fuentes incluidas**: EB Garamond (libro clásico), Cormorant, Lora, Playfair, Merriweather, Georgia, Palatino, Inter, Space Grotesk, Nunito, JetBrains Mono, Caveat (a mano) y la del sistema.
+- **Cualquiera instalada en tu PC**: escribe su nombre.
+- **Archivos de fuentes**: con **Agregar fuente** subes .ttf, .otf, .woff o .woff2. Se guardan en el plugin y no se suben a GitHub.
+
+Hay una vista previa para ver cómo queda.
+
 ### Estilo visual
 El tema está en `.obsidian/snippets/raiz-theme.css` y usa la paleta "bosque nocturno":
 - **Un color por día de la semana**: lunes celeste, martes menta, miércoles lima, jueves ámbar, viernes coral, sábado violeta y domingo turquesa.
@@ -200,11 +221,11 @@ El tema está en `.obsidian/snippets/raiz-theme.css` y usa la paleta "bosque noc
 
 ### Imagen de fondo de cada apartado
 En cualquier nota usa el botón **Fondo** de la cabecera, la opción **Cambiar imagen de fondo** del menú de la nota (⋯ o clic derecho en la pestaña) o el comando **Raíz: Cambiar imagen de fondo**. Puedes:
-- **Elegir una imagen de tu PC.** Se copia a `06 Templates/Portadas`, que no se sube a GitHub.
+- **Elegir una imagen de tu PC.** Se copia a `06 Plantillas/Portadas`, que no se sube a GitHub.
 - Pegar una URL, o usar uno de los fondos de Raíz o una imagen al azar.
 - Aplicarla **solo a esa nota** o a **todo el apartado**: días, semanas, meses, trimestres, años, Académico, Entrenamiento, Agenda, Biblioteca, Conocimiento, Inicio o Bandeja. Con todo el apartado cambian las notas que ya tienes ahí y las que crees después. Tus portadas propias se respetan.
 - **Restaurar el original** cuando quieras. En **Ajustes → Raíz → Fondos por apartado** ves los que cambiaste.
 
-Los banners se generan con código (aurora, curvas de nivel y raíces) y están en `06 Templates/Banners`. Para cambiar un color, edita las variables `--raiz-a1` y `--raiz-a2` del snippet.
+Los banners se generan con código (aurora, curvas de nivel y raíces) y están en `06 Plantillas/Banners`. Para cambiar un color, edita las variables `--raiz-a1` y `--raiz-a2` del snippet.
 
-> Todo es tuyo: el plugin está en `.obsidian/plugins/raiz/main.js` (JavaScript plano, sin compilar) y las plantillas en `06 Templates`. El vault tiene historial con git, así que cualquier cambio se puede deshacer.
+> Todo es tuyo: el plugin está en `.obsidian/plugins/raiz/main.js` (JavaScript plano, sin compilar) y las plantillas en `06 Plantillas`. El vault tiene historial con git, así que cualquier cambio se puede deshacer.

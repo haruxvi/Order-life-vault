@@ -41,5 +41,5 @@ These plugins are used by the vault but are **not redistributed**, because their
 I wrote these myself:
 - The **Raíz** plugin (`.obsidian/plugins/raiz`).
 - The theme `.obsidian/snippets/raiz-theme.css`.
-- The code-generated SVG banners in `06 Templates/Banners`.
-- The templates in `06 Templates`, and the vault's notes and dashboards.
+- The code-generated SVG banners in `06 Plantillas/Banners`.
+- The templates in `06 Plantillas`, and the vault's notes and dashboards.

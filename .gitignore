@@ -17,5 +17,8 @@
 11 Biblioteca/_portadas/
 
 # Tus portadas (imágenes de terceros): se quedan en tu PC
-06 Templates/Portadas/*
-!06 Templates/Portadas/.gitkeep
+06 Plantillas/Portadas/*
+!06 Plantillas/Portadas/.gitkeep
+
+# Fuentes que agregas desde tu PC (pueden tener licencia propia)
+.obsidian/plugins/raiz/fuentes/
