@@ -1,0 +1,90 @@
+filters:
+  and:
+    - file.inFolder("11 Biblioteca")
+    - tipo == "medio"
+formulas:
+  avance: if(total, (progreso / total * 100).round() + "%", "")
+properties:
+  note.titulo:
+    displayName: Título
+  note.categoria:
+    displayName: Categoría
+  note.estado:
+    displayName: Estado
+  note.puntuacion:
+    displayName: Nota
+  note.creador:
+    displayName: Autor / estudio
+  note.anio:
+    displayName: Año
+  formula.avance:
+    displayName: Avance
+views:
+  - type: table
+    name: Todo (planilla)
+    order:
+      - file.name
+      - categoria
+      - estado
+      - puntuacion
+      - formula.avance
+      - creador
+      - anio
+      - generos
+    sort:
+      - property: categoria
+        direction: ASC
+      - property: puntuacion
+        direction: DESC
+  - type: cards
+    name: 🎮 Juegos
+    filters:
+      and:
+        - categoria == "juego"
+    order:
+      - titulo
+      - estado
+      - puntuacion
+    image: note.portada
+    imageFit: cover
+    imageAspectRatio: 1.5
+    cardSize: 180
+  - type: cards
+    name: 📚 Libros
+    filters:
+      and:
+        - categoria == "libro"
+    order:
+      - titulo
+      - estado
+      - puntuacion
+    image: note.portada
+    imageFit: cover
+    imageAspectRatio: 1.5
+    cardSize: 180
+  - type: cards
+    name: 🌸 Anime
+    filters:
+      and:
+        - categoria == "anime"
+    order:
+      - titulo
+      - estado
+      - puntuacion
+    image: note.portada
+    imageFit: cover
+    imageAspectRatio: 1.5
+    cardSize: 180
+  - type: cards
+    name: 📖 Manga
+    filters:
+      and:
+        - categoria == "manga"
+    order:
+      - titulo
+      - estado
+      - puntuacion
+    image: note.portada
+    imageFit: cover
+    imageAspectRatio: 1.5
+    cardSize: 180

@@ -1,0 +1,73 @@
+{
+  "command_timeout": 5,
+  "templates_folder": "06 Templates",
+  "templates_pairs": [
+    [
+      "",
+      ""
+    ]
+  ],
+  "trigger_on_file_creation": true,
+  "auto_jump_to_cursor": true,
+  "enable_system_commands": false,
+  "shell_path": "",
+  "user_scripts_folder": "",
+  "enable_folder_templates": true,
+  "folder_templates": [
+    {
+      "folder": "01 Daily",
+      "template": "06 Templates/Plantillas/Diaria.md"
+    },
+    {
+      "folder": "02 Weekly",
+      "template": "06 Templates/Plantillas/Semanal.md"
+    },
+    {
+      "folder": "03 Monthly",
+      "template": "06 Templates/Plantillas/Mensual.md"
+    },
+    {
+      "folder": "04 Quarterly",
+      "template": "06 Templates/Plantillas/Trimestral.md"
+    },
+    {
+      "folder": "05 Yearly",
+      "template": "06 Templates/Plantillas/Anual.md"
+    }
+  ],
+  "enable_file_templates": false,
+  "file_templates": [
+    {
+      "regex": ".*/01 Daily/.*$",
+      "template": "06 Templates/Plantillas/Diaria.md"
+    },
+    {
+      "regex": ".*/02 Weekly/.*$",
+      "template": "06 Templates/Plantillas/Semanal.md"
+    },
+    {
+      "regex": ".*/03 Monthly/.*$",
+      "template": "06 Templates/Plantillas/Mensual.md"
+    },
+    {
+      "regex": ".*/04 Quarterly/.*$",
+      "template": "06 Templates/Plantillas/Trimestral.md"
+    },
+    {
+      "regex": ".*/05 Yearly/.*$",
+      "template": "06 Templates/Plantillas/Anual.md"
+    }
+  ],
+  "syntax_highlighting": true,
+  "syntax_highlighting_mobile": false,
+  "enabled_templates_hotkeys": [],
+  "startup_templates": [
+    ""
+  ],
+  "intellisense_render": 1,
+  "ignore_folders_on_creation": [
+    {
+      "folder": ""
+    }
+  ]
+}

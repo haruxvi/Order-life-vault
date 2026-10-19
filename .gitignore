@@ -1,0 +1,17 @@
+# Estado local de Obsidian
+.obsidian/workspace*.json
+.trash/
+
+# Herramientas externas (no son parte del vault)
+.anchor/
+
+# Datos generados por Raíz en cada equipo
+.obsidian/plugins/raiz/vectores.json
+.obsidian/plugins/*/data.json.backup*
+
+# Plugins sin licencia declarada: no se redistribuyen (ver TERCEROS.md)
+.obsidian/plugins/oz-image-plugin/
+.obsidian/plugins/url-into-selection/
+
+# Portadas descargadas de servicios externos (pertenecen a sus titulares)
+11 Biblioteca/_portadas/

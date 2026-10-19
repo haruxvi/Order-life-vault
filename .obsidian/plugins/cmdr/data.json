@@ -1,0 +1,100 @@
+{
+  "confirmDeletion": true,
+  "showAddCommand": false,
+  "debug": false,
+  "editorMenu": [],
+  "fileMenu": [],
+  "leftRibbon": [
+    {
+      "id": "journals:open-calendar",
+      "icon": "lucide-calendar",
+      "name": "Journals: Open calendar",
+      "mode": "any",
+      "color": "#000000"
+    },
+    {
+      "id": "journals::open-daily-note",
+      "icon": "lucide-calendar-days",
+      "name": "Open daily note",
+      "mode": "any",
+      "color": "#0eaa18"
+    },
+    {
+      "id": "raiz:ask-vault",
+      "icon": "lucide-sparkles",
+      "name": "Raíz: Pregúntale a tu vault",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:open-connections",
+      "icon": "lucide-waypoints",
+      "name": "Raíz: Panel de conexiones",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:capture",
+      "icon": "lucide-inbox",
+      "name": "Raíz: Captura rápida",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:open-today",
+      "icon": "lucide-sun",
+      "name": "Raíz: Abrir la nota de hoy",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:new-event",
+      "icon": "lucide-calendar-plus",
+      "name": "Raíz: Nuevo evento o reunión",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:add-media",
+      "icon": "lucide-library",
+      "name": "Raíz: Agregar a la biblioteca",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:new-knowledge-note",
+      "icon": "lucide-brain",
+      "name": "Raíz: Nueva nota de conocimiento",
+      "mode": "any"
+    },
+    {
+      "id": "raiz:open-settings",
+      "icon": "lucide-settings",
+      "name": "Raíz: Abrir ajustes",
+      "mode": "any"
+    }
+  ],
+  "rightRibbon": [],
+  "titleBar": [],
+  "statusBar": [],
+  "pageHeader": [],
+  "macros": [],
+  "explorer": [],
+  "hide": {
+    "statusbar": [
+      "js-engine"
+    ],
+    "leftRibbon": [
+      "🚩 Pixel Banner Menu",
+      "Templater",
+      "Insert Callout",
+      "Open rulebook",
+      "BRAT"
+    ]
+  },
+  "spacing": "20",
+  "advancedToolbar": {
+    "rowHeight": 48,
+    "rowCount": 1,
+    "spacing": 0,
+    "buttonWidth": 48,
+    "columnLayout": false,
+    "mappedIcons": [],
+    "tooltips": false,
+    "heightOffset": 0
+  }
+}

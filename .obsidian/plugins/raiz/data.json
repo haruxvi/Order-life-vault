@@ -1,0 +1,195 @@
+{
+  "ollamaUrl": "http://127.0.0.1:11434",
+  "modelMode": "auto",
+  "fastModel": "qwen2.5:3b",
+  "deepModel": "qwen2.5:7b",
+  "lowRamDeepModel": "qwen2.5:3b",
+  "lowRamThresholdGB": 12,
+  "numCtx": 8192,
+  "userProfile": "",
+  "semestreActual": "",
+  "notaAprobacion": 4,
+  "notaMin": 1,
+  "notaMax": 7,
+  "metaSesionesSemana": 4,
+  "restSeconds": 90,
+  "embedModel": "bge-m3",
+  "newCardsPerDay": 15,
+  "autoIndex": true,
+  "mediaStates": [
+    "Pendiente",
+    "En curso",
+    "Terminado",
+    "Pausado",
+    "Abandonado"
+  ],
+  "mediaCategories": [
+    {
+      "key": "juego",
+      "label": "Juegos",
+      "emoji": "🎮",
+      "color": "#a78bfa",
+      "provider": "steam",
+      "unidad": "horas"
+    },
+    {
+      "key": "libro",
+      "label": "Libros",
+      "emoji": "📚",
+      "color": "#f59e0b",
+      "provider": "openlibrary",
+      "unidad": "páginas"
+    },
+    {
+      "key": "anime",
+      "label": "Anime",
+      "emoji": "🌸",
+      "color": "#fb7185",
+      "provider": "anime",
+      "unidad": "episodios"
+    },
+    {
+      "key": "manga",
+      "label": "Manga",
+      "emoji": "📖",
+      "color": "#38bdf8",
+      "provider": "manga",
+      "unidad": "capítulos"
+    },
+    {
+      "key": "pelicula",
+      "label": "Películas",
+      "emoji": "🎬",
+      "color": "#34d399",
+      "provider": "wikipedia",
+      "unidad": "min"
+    },
+    {
+      "key": "serie",
+      "label": "Series",
+      "emoji": "📺",
+      "color": "#f472b6",
+      "provider": "tvmaze",
+      "unidad": "episodios"
+    }
+  ],
+  "trainingTypes": [
+    "Empuje",
+    "Tirón",
+    "Pierna",
+    "Torso",
+    "Full body",
+    "Calistenia",
+    "Skills",
+    "Cardio",
+    "Deporte",
+    "Movilidad",
+    "Descanso"
+  ],
+  "wheelAreas": [
+    {
+      "key": "salud",
+      "emoji": "😴",
+      "label": "Salud y descanso",
+      "color": "#26a69a",
+      "desc": "sueño, alimentación, energía, enfermedades, chequeos"
+    },
+    {
+      "key": "entrenamiento",
+      "emoji": "🏋️",
+      "label": "Entrenamiento",
+      "color": "#ef5350",
+      "desc": "gym, calistenia, deportes, constancia y progreso"
+    },
+    {
+      "key": "trabajo",
+      "emoji": "💼",
+      "label": "Trabajo y carrera",
+      "color": "#42a5f5",
+      "desc": "trabajo, proyectos, práctica, desarrollo profesional"
+    },
+    {
+      "key": "estudios",
+      "emoji": "🎓",
+      "label": "Estudios y aprendizaje",
+      "color": "#7e57c2",
+      "desc": "universidad, ramos, evaluaciones, cursos, lectura técnica"
+    },
+    {
+      "key": "relaciones",
+      "emoji": "❤️",
+      "label": "Familia y pareja",
+      "color": "#ec407a",
+      "desc": "familia, pareja, relaciones cercanas"
+    },
+    {
+      "key": "social",
+      "emoji": "👥",
+      "label": "Amigos y vida social",
+      "color": "#ab47bc",
+      "desc": "amigos, salidas, comunidad"
+    },
+    {
+      "key": "finanzas",
+      "emoji": "💰",
+      "label": "Finanzas",
+      "color": "#66bb6a",
+      "desc": "gastos, ahorro, ingresos, compras"
+    },
+    {
+      "key": "mente",
+      "emoji": "🧘",
+      "label": "Mente y propósito",
+      "color": "#ffa726",
+      "desc": "ánimo, estrés, reflexión, metas personales, crecimiento"
+    },
+    {
+      "key": "ocio",
+      "emoji": "🎮",
+      "label": "Ocio y diversión",
+      "color": "#ffca28",
+      "desc": "hobbies, juegos, series, descanso activo"
+    }
+  ],
+  "habits": [
+    {
+      "key": "agua",
+      "label": "💧 2 L de agua"
+    },
+    {
+      "key": "proteina",
+      "label": "🥩 Meta de proteína"
+    },
+    {
+      "key": "lectura",
+      "label": "📖 Leer 20 min"
+    },
+    {
+      "key": "aprender",
+      "label": "🧠 Aprender algo nuevo"
+    },
+    {
+      "key": "planificar",
+      "label": "🗒️ Planificar el día"
+    },
+    {
+      "key": "pantallas",
+      "label": "📵 Sin pantallas antes de dormir"
+    }
+  ],
+  "folders": {
+    "daily": "01 Daily",
+    "weekly": "02 Weekly",
+    "monthly": "03 Monthly",
+    "quarterly": "04 Quarterly",
+    "yearly": "05 Yearly",
+    "templates": "06 Templates/Raiz",
+    "academic": "08 Académico",
+    "training": "09 Entrenamiento",
+    "agenda": "10 Agenda",
+    "library": "11 Biblioteca",
+    "banners": "06 Templates/Banners",
+    "knowledge": "12 Conocimiento",
+    "inbox": "00 Bandeja"
+  }
+}

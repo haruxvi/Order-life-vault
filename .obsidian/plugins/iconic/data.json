@@ -1,0 +1,133 @@
+{
+  "biggerIcons": "mobile",
+  "clickableIcons": "desktop",
+  "showAllFileIcons": true,
+  "showAllFolderIcons": true,
+  "minimalFolderIcons": false,
+  "showMarkdownTabIcons": true,
+  "showTitleIcons": true,
+  "showTagPillIcons": true,
+  "showMenuActions": true,
+  "showSuggestionIcons": true,
+  "showQuickSwitcherIcons": true,
+  "showMoveFileIcons": true,
+  "showItemName": "desktop",
+  "biggerSearchResults": "mobile",
+  "maxSearchResults": 50,
+  "colorPicker1": "list",
+  "colorPicker2": "rgb",
+  "uncolorHover": false,
+  "uncolorDrag": false,
+  "uncolorSelect": false,
+  "uncolorQuick": false,
+  "maxBackups": 2,
+  "dialogState": {
+    "iconMode": true,
+    "emojiMode": false,
+    "rulePage": "folder"
+  },
+  "appIcons": {},
+  "tabIcons": {},
+  "fileIcons": {
+    "00 Bandeja": {
+      "icon": "lucide-inbox",
+      "color": "#a3e635"
+    },
+    "00 Bandeja/Bandeja.md": {
+      "icon": "lucide-inbox",
+      "color": "#a3e635"
+    },
+    "00 Dashboard": {
+      "icon": "lucide-home",
+      "unsynced": [
+        "51487f92ee3c0ec4",
+        "bf6a0489a4cf6a0e",
+        "f7444aa04d6b1c04",
+        "04dc035d9468dec2",
+        "e2416492c4a4230f",
+        "ad0e91f922f54505",
+        "fc36afb400035e33",
+        "145d20372a951d2e"
+      ]
+    },
+    "01 Daily": {
+      "icon": "lucide-sparkle",
+      "unsynced": [
+        "ad0e91f922f54505",
+        "fc36afb400035e33",
+        "145d20372a951d2e"
+      ]
+    },
+    "02 Weekly": {
+      "icon": "lucide-stars",
+      "unsynced": [
+        "51487f92ee3c0ec4",
+        "bf6a0489a4cf6a0e",
+        "f7444aa04d6b1c04",
+        "04dc035d9468dec2",
+        "e2416492c4a4230f",
+        "ad0e91f922f54505",
+        "fc36afb400035e33",
+        "145d20372a951d2e"
+      ]
+    },
+    "03 Monthly": {
+      "icon": "lucide-star",
+      "unsynced": [
+        "51487f92ee3c0ec4",
+        "bf6a0489a4cf6a0e",
+        "f7444aa04d6b1c04",
+        "04dc035d9468dec2",
+        "e2416492c4a4230f",
+        "ad0e91f922f54505",
+        "fc36afb400035e33",
+        "145d20372a951d2e"
+      ]
+    },
+    "04 Quarterly": {
+      "icon": "lucide-moon-star",
+      "unsynced": [
+        "51487f92ee3c0ec4",
+        "bf6a0489a4cf6a0e",
+        "f7444aa04d6b1c04",
+        "04dc035d9468dec2",
+        "e2416492c4a4230f",
+        "ad0e91f922f54505",
+        "fc36afb400035e33",
+        "145d20372a951d2e"
+      ]
+    },
+    "05 Yearly": {
+      "icon": "lucide-flower",
+      "unsynced": [
+        "51487f92ee3c0ec4",
+        "bf6a0489a4cf6a0e",
+        "f7444aa04d6b1c04",
+        "04dc035d9468dec2",
+        "e2416492c4a4230f",
+        "ad0e91f922f54505",
+        "fc36afb400035e33",
+        "145d20372a951d2e"
+      ]
+    },
+    "07 Notes/Dev goals.md": {
+      "icon": "lucide-goal",
+      "color": "red"
+    },
+    "12 Conocimiento/Etiquetas.md": {
+      "icon": "lucide-tags",
+      "color": "#22d3ee"
+    },
+    "12 Conocimiento/Repaso.md": {
+      "icon": "lucide-layers",
+      "color": "#22d3ee"
+    }
+  },
+  "bookmarkIcons": {},
+  "tagIcons": {},
+  "propertyIcons": {},
+  "ribbonIcons": {},
+  "fileRules": [],
+  "folderRules": [],
+  "rememberDeletedItems": false
+}

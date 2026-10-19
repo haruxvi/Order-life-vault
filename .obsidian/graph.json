@@ -1,0 +1,58 @@
+{
+  "collapse-filter": false,
+  "search": "-path:\"06 Templates\" -path:\"00 Dashboard\" -path:\"07 Notes/Extras\"  -path:\"00 Bandeja\"",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": true,
+  "showOrphans": false,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:\"01 Daily\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 12320680
+      }
+    },
+    {
+      "query": "path:\"02 Weekly\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 1561533
+      }
+    },
+    {
+      "query": "path:\"03 Monthly\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 49151
+      }
+    },
+    {
+      "query": "path:\"04 Quarterly\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 2303
+      }
+    },
+    {
+      "query": "path:\"05 Yearly\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 11403519
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.330449826989619,
+  "repelStrength": 20,
+  "linkStrength": 1,
+  "linkDistance": 473,
+  "scale": 0.368129380283717,
+  "close": true
+}

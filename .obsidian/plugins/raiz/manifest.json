@@ -1,0 +1,9 @@
+{
+  "id": "raiz",
+  "name": "Raíz",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "IA local e ilimitada (Ollama), entrenamiento, vida académica, agenda, hábitos y gráficos para tu diario. Sin claves ni licencias.",
+  "author": "Vicente",
+  "isDesktopOnly": false
+}
