@@ -9,7 +9,7 @@ cssclasses:
   - raiz-wide
   - raiz-panel
 ---
-# 📚 Biblioteca
+# Biblioteca
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.library(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```

@@ -10,7 +10,7 @@ participantes: "{{participantes}}"
 tags:
   - evento
 ---
-# 📅 {{titulo}}
+# {{titulo}}
 **{{fechaLarga}}** · `VIEW[{hora}]` · {{categoria}} · {{lugar}}
 
 ## Antes

@@ -5,7 +5,7 @@
  * agenda, hábitos y gráficos. Expone su API en window.raiz para las plantillas de Templater
  * y los bloques dataviewjs.
  */
-const { Plugin, PluginSettingTab, Setting, Notice, Modal, FuzzySuggestModal, ItemView, MarkdownRenderer, MarkdownView, getAllTags, requestUrl, TFile, moment } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Notice, Modal, FuzzySuggestModal, ItemView, MarkdownRenderer, MarkdownView, Menu, setIcon, getIconIds, getAllTags, requestUrl, TFile, moment } = require('obsidian');
 
 // ───────────────────────────── Configuración por defecto ─────────────────────────────
 
@@ -23,10 +23,28 @@ const DEFAULT_SETTINGS = {
   notaMin: 1.0,
   notaMax: 7.0,
   metaSesionesSemana: 4,
+  // Metas diarias: cada quien pone las suyas (los números son solo un ejemplo hasta que el usuario los ajuste)
+  goals: [
+    { key: 'kcal', label: 'Calorías', icon: 'utensils', unit: 'kcal', goal: 2000, step: 100, color: '#22c55e', group: 'Comida', tipo: 'meta', estilo: 'anillo' },
+    { key: 'proteina', label: 'Proteína', icon: 'beef', unit: 'g', goal: 120, step: 10, color: '#f472b6', group: 'Comida', tipo: 'meta', estilo: 'barra' },
+    { key: 'carbos', label: 'Carbohidratos', icon: 'wheat', unit: 'g', goal: 250, step: 10, color: '#fbbf24', group: 'Comida', tipo: 'meta', estilo: 'barra' },
+    { key: 'grasas', label: 'Grasas', icon: 'droplets', unit: 'g', goal: 70, step: 5, color: '#a78bfa', group: 'Comida', tipo: 'meta', estilo: 'barra' },
+    { key: 'agua', label: 'Agua', icon: 'droplet', unit: 'L', goal: 2.5, step: 0.25, color: '#38bdf8', group: 'Comida', tipo: 'meta', estilo: 'anillo' },
+    { key: 'ejercicio', label: 'Ejercicio', icon: 'flame', unit: 'min', goal: 45, step: 5, color: '#f97316', group: 'Actividad', tipo: 'meta', estilo: 'anillo' },
+    { key: 'pasos', label: 'Pasos', icon: 'footprints', unit: 'pasos', goal: 7000, step: 500, color: '#14b8a6', group: 'Actividad', tipo: 'meta', estilo: 'anillo' },
+    { key: 'sueno', label: 'Sueño', icon: 'moon', unit: 'h', goal: 8, step: 0.5, color: '#6366f1', group: 'Cuerpo', tipo: 'meta', estilo: 'anillo' },
+    { key: 'peso', label: 'Peso', icon: 'scale', unit: 'kg', goal: null, step: 0.1, color: '#ab47bc', group: 'Cuerpo', tipo: 'medida', estilo: 'anillo' },
+    { key: 'lectura', label: 'Lectura', icon: 'book-open', unit: 'min', goal: 20, step: 5, color: '#eab308', group: 'Mente', tipo: 'meta', estilo: 'anillo' },
+    { key: 'horasEstudio', label: 'Estudio', icon: 'graduation-cap', unit: 'h', goal: 2, step: 0.5, color: '#8b5cf6', group: 'Mente', tipo: 'meta', estilo: 'anillo' },
+  ],
+  goalsReviewed: false,
+  sectionBanners: {},
   restSeconds: 90,
   embedModel: 'bge-m3',
+  hubCards: '',
   newCardsPerDay: 15,
   autoIndex: true,
+  autoSubpages: true,
   mediaStates: ['Pendiente', 'En curso', 'Terminado', 'Pausado', 'Abandonado'],
   mediaCategories: [
     { key: 'juego', label: 'Juegos', emoji: '🎮', color: '#a78bfa', provider: 'steam', unidad: 'horas' },
@@ -49,9 +67,6 @@ const DEFAULT_SETTINGS = {
     { key: 'ocio', emoji: '🎮', label: 'Ocio y diversión', color: '#ffca28', desc: 'hobbies, juegos, series, descanso activo' },
   ],
   habits: [
-    { key: 'agua', label: '💧 2 L de agua' },
-    { key: 'proteina', label: '🥩 Meta de proteína' },
-    { key: 'lectura', label: '📖 Leer 20 min' },
     { key: 'aprender', label: '🧠 Aprender algo nuevo' },
     { key: 'planificar', label: '🗒️ Planificar el día' },
     { key: 'pantallas', label: '📵 Sin pantallas antes de dormir' },
@@ -68,6 +83,8 @@ const DEFAULT_SETTINGS = {
     agenda: '10 Agenda',
     library: '11 Biblioteca',
     banners: '06 Templates/Banners',
+    dashboard: '00 Dashboard',
+    covers: '06 Templates/Portadas',
     knowledge: '12 Conocimiento',
     inbox: '00 Bandeja',
   },
@@ -119,6 +136,9 @@ function toArr(v) {
 }
 function hasTipo(page, tipo) {
   return toArr(page.tipo).some((t) => String(t).toLowerCase() === tipo);
+}
+function deEmoji(t) {
+  return String(t).replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '').trim();
 }
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
@@ -685,6 +705,290 @@ class AskVaultModal extends Modal {
   }
 }
 
+
+/** Selector de íconos (Lucide) con búsqueda y vista previa, al estilo Notion. */
+class IconModal extends Modal {
+  constructor(plugin, onChoose) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.onChoose = onChoose;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    this.modalEl.addClass('raiz-icon-modal');
+    contentEl.createEl('h3', { text: 'Ícono de la página' });
+    const input = contentEl.createEl('input', { cls: 'raiz-input', attr: { type: 'search', placeholder: 'Buscar en inglés: book, code, brain, flask, cpu, sigma… o pega un emoji' } });
+    const grid = contentEl.createDiv({ cls: 'raiz-icon-grid' });
+    const all = getIconIds().map((id) => id.replace(/^lucide-/, '')).sort();
+    const featured = ['book-open', 'notebook-pen', 'graduation-cap', 'code-2', 'cpu', 'brain', 'sigma', 'calculator', 'flask-conical', 'atom', 'network', 'database', 'server', 'globe', 'languages', 'music', 'palette', 'dumbbell', 'heart-pulse', 'briefcase', 'lightbulb', 'puzzle', 'rocket', 'compass', 'layers', 'pen-tool', 'scroll-text', 'library', 'microscope', 'binary', 'terminal', 'git-branch', 'bot', 'chart-line', 'map', 'star'];
+    const draw = (q) => {
+      grid.empty();
+      const list = q ? all.filter((x) => x.includes(q.toLowerCase())).slice(0, 160) : featured.filter((x) => all.includes(x));
+      for (const id of list) {
+        const b = grid.createEl('button', { cls: 'raiz-icon-cell', attr: { 'aria-label': id, title: id } });
+        setIcon(b, id);
+        b.addEventListener('click', () => {
+          this.close();
+          this.onChoose(id);
+        });
+      }
+      if (q && /\p{Extended_Pictographic}/u.test(q)) {
+        const b = grid.createEl('button', { cls: 'raiz-icon-cell', text: q.trim() });
+        b.addEventListener('click', () => {
+          this.close();
+          this.onChoose(q.trim());
+        });
+      }
+      if (!grid.childElementCount) grid.createDiv({ cls: 'raiz-muted', text: 'Sin resultados.' });
+    };
+    input.addEventListener('input', () => draw(input.value.trim()));
+    const row = contentEl.createDiv({ cls: 'raiz-lib-bar' });
+    row.createEl('button', { cls: 'raiz-chip', text: 'Quitar ícono' }).addEventListener('click', () => {
+      this.close();
+      this.onChoose('');
+    });
+    draw('');
+    setTimeout(() => input.focus(), 50);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/** Selector de portada: imágenes de tu carpeta de portadas, una URL o una al azar. */
+class CoverModal extends Modal {
+  constructor(plugin, file) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.file = file;
+  }
+  onOpen() {
+    const p = this.plugin;
+    const { contentEl } = this;
+    this.modalEl.addClass('raiz-media-modal');
+    contentEl.createEl('h3', { text: 'Portada' });
+    const folder = p.settings.folders.covers;
+    const imgs = this.app.vault.getFiles().filter((f) => f.path.startsWith(folder + '/') && /^(png|jpe?g|gif|webp|avif|svg)$/i.test(f.extension));
+    const set = async (value) => {
+      await this.app.fileManager.processFrontMatter(this.file, (fm) => {
+        if (value) {
+          fm.banner = value;
+          fm['banner-height'] = fm['banner-height'] || 260;
+          fm['content-start'] = fm['content-start'] || 190;
+          fm['banner-fade'] = fm['banner-fade'] ?? -70;
+          fm['banner-radius'] = fm['banner-radius'] ?? 16;
+        } else delete fm.banner;
+      });
+      this.close();
+    };
+    const bar = contentEl.createDiv({ cls: 'raiz-lib-bar' });
+    const url = bar.createEl('input', { cls: 'raiz-input', attr: { type: 'url', placeholder: 'Pega la URL de una imagen…' } });
+    bar.createEl('button', { cls: 'mod-cta', text: 'Usar URL' }).addEventListener('click', () =>
+      p.run(async () => {
+        const u = url.value.trim();
+        if (!u) return;
+        const saved = await p.downloadCover(u, `portada ${this.file.basename}`, null, folder);
+        await set(saved ? `[[${saved}]]` : u);
+      })
+    );
+    if (imgs.length) {
+      bar.createEl('button', { cls: 'raiz-chip', text: 'Al azar' }).addEventListener('click', () => set(`[[${imgs[Math.floor(Math.random() * imgs.length)].path}]]`));
+    }
+    bar.createEl('button', { cls: 'raiz-chip', text: 'Quitar portada' }).addEventListener('click', () => set(''));
+    contentEl.createDiv({ cls: 'raiz-muted', text: imgs.length ? `${imgs.length} imágenes en "${folder}". Agrega las tuyas a esa carpeta.` : `Agrega tus imágenes favoritas a la carpeta "${folder}" para elegirlas aquí.` });
+    const grid = contentEl.createDiv({ cls: 'raiz-cover-grid' });
+    for (const f of imgs) {
+      const cell = grid.createDiv({ cls: 'raiz-cover-cell' });
+      cell.createEl('img', { attr: { src: this.app.vault.getResourcePath(f), loading: 'lazy', alt: f.basename } });
+      cell.addEventListener('click', () => set(`[[${f.path}]]`));
+    }
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/** Editor de "Mis metas": cada quien define qué mide, cuánto y en qué unidad. */
+class GoalsModal extends Modal {
+  constructor(plugin, onSave) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.onSave = onSave;
+    this.goals = JSON.parse(JSON.stringify(plugin.settings.goals || []));
+  }
+  onOpen() {
+    this.modalEl.addClass('raiz-goals-modal');
+    this.render();
+  }
+  render() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h3', { text: 'Mis metas' });
+    contentEl.createDiv({
+      cls: 'raiz-muted',
+      text: 'Pon tus propios números: no hay fórmulas ni valores "correctos". Una meta suma hacia un objetivo (agua, pasos, lectura…); una medida solo se registra (peso, por ejemplo) y puede tener un objetivo opcional.',
+    });
+    const list = contentEl.createDiv({ cls: 'raiz-goal-edit-list' });
+    const head = list.createDiv({ cls: 'raiz-goal-edit-row is-head' });
+    for (const t of ['', '', 'Nombre', 'Objetivo', 'Unidad', 'Paso', 'Grupo', 'Tipo', 'Estilo', '', '']) head.createSpan({ text: t });
+    this.goals.forEach((g, i) => {
+      const row = list.createDiv({ cls: 'raiz-goal-edit-row' + (g.on === false ? ' is-off' : '') });
+      const on = row.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Activa' } });
+      on.checked = g.on !== false;
+      on.addEventListener('change', () => ((g.on = on.checked), row.toggleClass('is-off', !on.checked)));
+      const ic = row.createEl('button', { cls: 'raiz-goal-edit-icon', attr: { 'aria-label': 'Ícono y color' } });
+      ic.style.color = g.color || 'var(--interactive-accent)';
+      setIcon(ic, g.icon || 'target');
+      ic.addEventListener('click', () => new IconModal(this.plugin, (v) => ((g.icon = v), this.render())).open());
+      const inp = (key, type, ph, w) => {
+        const el = row.createEl('input', { cls: 'raiz-input', attr: { type, placeholder: ph } });
+        el.value = g[key] ?? '';
+        if (w) el.style.width = w;
+        el.addEventListener('input', () => (g[key] = type === 'number' ? (el.value === '' ? null : Number(el.value)) : el.value));
+        return el;
+      };
+      inp('label', 'text', 'Ej: Agua');
+      inp('goal', 'number', '—');
+      inp('unit', 'text', 'L, g, min…');
+      inp('step', 'number', '1');
+      inp('group', 'text', 'Grupo');
+      const sel = (key, opts) => {
+        const s = row.createEl('select', { cls: 'dropdown' });
+        for (const [v, t] of opts) s.createEl('option', { value: v, text: t });
+        s.value = g[key] || opts[0][0];
+        s.addEventListener('change', () => (g[key] = s.value));
+      };
+      sel('tipo', [['meta', 'Meta'], ['medida', 'Medida']]);
+      sel('estilo', [['anillo', 'Anillo'], ['barra', 'Barra']]);
+      const color = row.createEl('input', { attr: { type: 'color', 'aria-label': 'Color' } });
+      color.value = /^#[0-9a-f]{6}$/i.test(g.color || '') ? g.color : '#22c55e';
+      color.addEventListener('input', () => ((g.color = color.value), (ic.style.color = color.value)));
+      const tools = row.createDiv({ cls: 'raiz-goal-edit-tools' });
+      const tool = (icon, label, fn) => {
+        const b = tools.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': label } });
+        setIcon(b, icon);
+        b.addEventListener('click', fn);
+      };
+      tool('arrow-up', 'Subir', () => i > 0 && (([this.goals[i - 1], this.goals[i]] = [this.goals[i], this.goals[i - 1]]), this.render()));
+      tool('trash-2', 'Quitar', () => (this.goals.splice(i, 1), this.render()));
+    });
+    const bar = contentEl.createDiv({ cls: 'raiz-goal-edit-bar' });
+    bar.createEl('button', { text: 'Agregar meta' }).addEventListener('click', () => {
+      this.goals.push({ key: '', label: '', icon: 'target', unit: '', goal: null, step: 1, color: '#22c55e', group: this.goals[this.goals.length - 1]?.group || 'Mis metas', tipo: 'meta', estilo: 'anillo', on: true });
+      this.render();
+    });
+    bar.createEl('button', { cls: 'mod-cta', text: 'Guardar' }).addEventListener('click', () => this.save());
+  }
+  async save() {
+    const used = new Set();
+    const goals = [];
+    for (const g of this.goals) {
+      if (!String(g.label || '').trim()) continue;
+      let key = g.key || norm(g.label).replace(/[^a-z0-9]/g, '') || 'meta';
+      while (used.has(key)) key += '2';
+      used.add(key);
+      goals.push({ ...g, key, label: g.label.trim(), step: num(g.step) || 1, goal: num(g.goal) });
+    }
+    this.plugin.settings.goals = goals;
+    this.plugin.settings.goalsReviewed = true;
+    await this.plugin.saveSettings();
+    this.close();
+    new Notice('Metas guardadas.');
+    this.onSave?.();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/** Portada o fondo de una nota, o de todo su apartado (días, semanas, académico…). */
+class BackgroundModal extends Modal {
+  constructor(plugin, file) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.file = file;
+    this.section = plugin.sectionOf(file);
+    this.scope = 'nota';
+  }
+  onOpen() {
+    const p = this.plugin;
+    const { contentEl } = this;
+    this.modalEl.addClass('raiz-media-modal');
+    contentEl.createEl('h3', { text: 'Imagen de fondo' });
+    if (this.section) {
+      const scope = contentEl.createDiv({ cls: 'raiz-scope' });
+      const opts = [['nota', 'Solo esta nota'], ['apartado', `Todo el apartado: ${this.section.label}`]];
+      const btns = opts.map(([k, t]) => {
+        const b = scope.createEl('button', { cls: 'raiz-chip' + (k === this.scope ? ' is-active' : ''), text: t });
+        b.addEventListener('click', () => {
+          this.scope = k;
+          btns.forEach((x) => x.removeClass('is-active'));
+          b.addClass('is-active');
+        });
+        return b;
+      });
+      contentEl.createDiv({ cls: 'raiz-muted', text: `"Todo el apartado" cambia las notas que ya tienes ahí y las que crees después.` });
+    }
+    const set = (value) =>
+      p.run(async () => {
+        if (this.scope === 'apartado' && this.section) await p.applySectionBanner(this.section, value);
+        else await p.setBanner(this.file, value);
+        this.close();
+      });
+    const bar = contentEl.createDiv({ cls: 'raiz-lib-bar' });
+    const url = bar.createEl('input', { cls: 'raiz-input', attr: { type: 'url', placeholder: 'Pega la URL de una imagen…' } });
+    bar.createEl('button', { cls: 'mod-cta', text: 'Usar URL' }).addEventListener('click', () =>
+      p.run(async () => {
+        const u = url.value.trim();
+        if (!u) return;
+        const saved = await p.downloadCover(u, `fondo ${this.scope === 'apartado' && this.section ? this.section.label : this.file.basename}`, null, p.settings.folders.covers);
+        await set(saved ? `[[${saved}]]` : u);
+      })
+    );
+    // Imagen desde el computador (o el teléfono): se copia a la carpeta de portadas, que no se sube a GitHub
+    const picker = bar.createEl('input', { attr: { type: 'file', accept: 'image/*' } });
+    picker.style.display = 'none';
+    bar.createEl('button', { cls: 'raiz-chip is-go', text: 'Elegir imagen del PC' }).addEventListener('click', () => picker.click());
+    picker.addEventListener('change', () =>
+      p.run(async () => {
+        const file = picker.files?.[0];
+        if (!file) return;
+        const dir = p.settings.folders.covers;
+        await p.ensureFolder(dir);
+        const ext = (file.name.match(/\.(png|jpe?g|gif|webp|avif|svg)$/i)?.[1] || 'png').toLowerCase();
+        const base = safeName(file.name.replace(/\.[^.]+$/, '')) || 'fondo';
+        let path = `${dir}/${base}.${ext}`;
+        for (let i = 2; this.app.vault.getAbstractFileByPath(path); i++) path = `${dir}/${base} ${i}.${ext}`;
+        await this.app.vault.createBinary(path, await file.arrayBuffer());
+        await set(`[[${path}]]`);
+      })
+    );
+    const covers = p.settings.folders.covers;
+    const isImg = (f) => /^(png|jpe?g|gif|webp|avif|svg)$/i.test(f.extension);
+    const mine = this.app.vault.getFiles().filter((f) => f.path.startsWith(covers + '/') && isImg(f));
+    const own = this.app.vault.getFiles().filter((f) => f.path.startsWith(p.settings.folders.banners + '/') && isImg(f));
+    const all = mine.concat(own);
+    if (all.length) bar.createEl('button', { cls: 'raiz-chip', text: 'Al azar' }).addEventListener('click', () => set(`[[${all[Math.floor(Math.random() * all.length)].path}]]`));
+    bar.createEl('button', { cls: 'raiz-chip', text: 'Restaurar el original' }).addEventListener('click', () => set(null));
+    bar.createEl('button', { cls: 'raiz-chip', text: 'Sin imagen' }).addEventListener('click', () => set(''));
+    const grid = (title, files, empty) => {
+      contentEl.createEl('h4', { cls: 'raiz-bg-title', text: title });
+      if (!files.length) return contentEl.createDiv({ cls: 'raiz-muted', text: empty });
+      const g = contentEl.createDiv({ cls: 'raiz-cover-grid' });
+      for (const f of files) {
+        const cell = g.createDiv({ cls: 'raiz-cover-cell' });
+        cell.createEl('img', { attr: { src: this.app.vault.getResourcePath(f), loading: 'lazy', alt: f.basename } });
+        cell.addEventListener('click', () => set(`[[${f.path}]]`));
+      }
+    };
+    grid('Tus imágenes', mine, `Agrega tus fotos o fondos favoritos a la carpeta "${covers}" y aparecen aquí.`);
+    grid('Fondos de Raíz', own, 'No hay fondos en la carpeta de banners.');
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 // ───────────────────────────── Plugin principal ─────────────────────────────
 
 module.exports = class RaizPlugin extends Plugin {
@@ -718,6 +1022,43 @@ module.exports = class RaizPlugin extends Plugin {
     this.addCommand({ id: 'ask-vault', name: 'Pregúntale a todo tu vault', callback: () => new AskVaultModal(this).open() });
     this.addCommand({ id: 'capture', name: 'Captura rápida a la bandeja', callback: () => this.capture() });
     this.addCommand({ id: 'generate-cards', name: 'Generar preguntas de repaso de esta nota', callback: () => this.run(() => this.generateCards()) });
+    this.addCommand({ id: 'new-study-page', name: 'Estudio: nueva página', callback: () => this.newStudyPage() });
+    this.addCommand({ id: 'new-child', name: 'Página: nueva entrada dentro de la nota abierta', callback: () => this.run(() => this.newChild()) });
+    this.addCommand({ id: 'insert-subpage', name: 'Insertar: nueva página enlazada aquí', editorCallback: () => this.run(() => this.insertSubpage()) });
+    this.addCommand({ id: 'insert-base', name: 'Insertar: base con vistas (subpáginas)', editorCallback: () => this.run(() => this.insertChildrenBase()) });
+    this.addCommand({ id: 'insert-page-card', name: 'Insertar: tarjeta de otra página', editorCallback: () => this.run(() => this.insertPageCard()) });
+    this.addCommand({ id: 'insert-module', name: 'Insertar: módulo (agenda, biblioteca, repaso…)', editorCallback: () => this.run(() => this.insertModule()) });
+    this.addCommand({ id: 'make-page', name: 'Convertir esta nota en página (ícono, portada, subpáginas)', callback: () => this.run(() => this.makePage()) });
+    this.addCommand({ id: 'new-class-note', name: 'Estudio: nueva nota de clase aquí', callback: () => { const f = this.app.workspace.getActiveFile(); this.newStudyPage(f && this.isStudyPage(f) ? { padre: f.basename, clase: 'apunte' } : { clase: 'apunte' }); } });
+    this.addCommand({ id: 'change-cover', name: 'Cambiar imagen de fondo (de la nota o de todo su apartado)', callback: () => new BackgroundModal(this, this.activeFile()).open() });
+    this.addCommand({ id: 'edit-goals', name: 'Editar mis metas (agua, comida, pasos, lectura…)', callback: () => this.editGoals() });
+    this.addCommand({ id: 'change-icon', name: 'Cambiar ícono de la nota', callback: () => { const f = this.activeFile(); new IconModal(this, (v) => this.app.fileManager.processFrontMatter(f, (x) => { x.icono = v; })).open(); } });
+    this.addCommand({ id: 'local-graph', name: 'Abrir grafo local al lado', callback: () => this.run(() => this.openLocalGraph()) });
+    this.addCommand({ id: 'ai-draft', name: 'IA: redactar apunte a partir del título', callback: () => this.run(() => this.aiDraft()) });
+    this.addCommand({ id: 'ai-explain', name: 'IA: explicar la selección', editorCallback: () => this.run(() => this.aiOnSelection('explicar')) });
+    this.addCommand({ id: 'ai-improve', name: 'IA: mejorar la redacción de la selección', editorCallback: () => this.run(() => this.aiOnSelection('mejorar')) });
+    this.addCommand({ id: 'ai-code', name: 'IA: ejemplo de código', editorCallback: () => this.run(() => this.aiOnSelection('codigo')) });
+    this.addCommand({ id: 'ai-tags', name: 'IA: sugerir etiquetas de tema', callback: () => this.run(() => this.aiTags()) });
+    this.addCommand({ id: 'ai-summary-prop', name: 'IA: resumir la nota en una frase', callback: () => this.run(() => this.aiSummaryProp()) });
+    for (const [id, name, text] of this.blockDefs()) this.addCommand({ id: `block-${id}`, name: `Bloque: ${name}`, editorCallback: () => this.run(() => this.insertBlock(text)) });
+    // Fondo de la nota o de su apartado desde el menú de la nota (⋯ o clic derecho en la pestaña)
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file) => {
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        menu.addItem((i) => i.setTitle('Cambiar imagen de fondo').setIcon('image').setSection('action').onClick(() => new BackgroundModal(this, file).open()));
+      })
+    );
+    // Menú contextual del editor para escribir con IA sobre lo seleccionado
+    this.registerEvent(
+      this.app.workspace.on('editor-menu', (menu, editor) => {
+        menu.addItem((i) => i.setTitle('Insertar página, base, tarjeta o módulo…').setIcon('plus').onClick((evt) => this.insertMenu(evt)));
+        if (!editor.getSelection().trim()) return;
+        menu.addItem((i) => i.setTitle('IA: explicar').setIcon('message-square-text').onClick(() => this.run(() => this.aiOnSelection('explicar'))));
+        menu.addItem((i) => i.setTitle('IA: mejorar redacción').setIcon('wand-2').onClick(() => this.run(() => this.aiOnSelection('mejorar'))));
+        menu.addItem((i) => i.setTitle('IA: ejemplo de código').setIcon('code-2').onClick(() => this.run(() => this.aiOnSelection('codigo'))));
+      })
+    );
+    this.addCommand({ id: 'prepare-workspace', name: 'Preparar mi espacio (calendario, grafo local y conexiones)', callback: () => this.run(() => this.prepareWorkspace()) });
     this.addCommand({ id: 'add-media', name: 'Agregar a la biblioteca (juego, libro, anime, manga…)', callback: () => new MediaModal(this).open() });
     this.addCommand({ id: 'new-knowledge-note', name: 'Nueva nota de conocimiento', callback: () => this.newKnowledgeNote() });
     this.addCommand({ id: 'new-moc', name: 'Nuevo mapa de contenido (MOC)', callback: () => this.newMoc() });
@@ -734,6 +1075,8 @@ module.exports = class RaizPlugin extends Plugin {
     this.addCommand({ id: 'summarize-current', name: 'IA: resumir / valorar la nota actual', callback: () => this.run(() => this.smartSummarize()) });
 
     this.app.workspace.onLayoutReady(async () => {
+      this.layoutReadyAt = Date.now();
+      this.registerEvent(this.app.vault.on('create', (f) => this.onLinkedNoteCreated(f).catch((e) => console.error('[Raíz]', e))));
       const st = await this.checkOllama(false);
       // Indexado en segundo plano para las conexiones (solo si el modelo de embeddings está instalado)
       const hasEmbed = st.ok && st.installed.some((m) => m.replace(/:latest$/, '') === this.settings.embedModel.replace(/:latest$/, ''));
@@ -750,6 +1093,13 @@ module.exports = class RaizPlugin extends Plugin {
     const data = (await this.loadData()) || {};
     this.settings = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), data);
     this.settings.folders = Object.assign({}, DEFAULT_SETTINGS.folders, data.folders || {});
+    // Agua, proteína y lectura pasaron de casillas a metas con número
+    if (!data.goals && Array.isArray(data.habits)) {
+      const old = ['💧 2 L de agua', '🥩 Meta de proteína', '📖 Leer 20 min'];
+      this.settings.habits = data.habits.filter((h) => !old.includes(h.label));
+    }
+    for (const c of [{ key: 'video', label: 'Videos', emoji: '▶️', color: '#ef4444', provider: 'youtube', unidad: 'min' }, { key: 'curso', label: 'Cursos', emoji: '🧭', color: '#22d3ee', provider: 'youtube', unidad: 'lecciones' }])
+      if (!this.settings.mediaCategories.some((x) => x.key === c.key)) this.settings.mediaCategories.push(c);
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -1570,14 +1920,14 @@ module.exports = class RaizPlugin extends Plugin {
     const text = await this.app.vault.read(tpl);
     return text.replace(/\{\{(\w+)\}\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : ''));
   }
-  async createNote(folder, name, content) {
+  async createNote(folder, name, content, open = true) {
     const dir = folder.replace(/\/+$/, '');
     await this.ensureFolder(dir);
     let path = `${dir}/${safeName(name)}.md`;
     let i = 2;
     while (this.app.vault.getAbstractFileByPath(path)) path = `${dir}/${safeName(name)} ${i++}.md`;
     const file = await this.app.vault.create(path, content);
-    await this.app.workspace.getLeaf(false).openFile(file);
+    if (open) await this.app.workspace.getLeaf(false).openFile(file);
     return file;
   }
   async ensureFolder(dir) {
@@ -1736,13 +2086,23 @@ module.exports = class RaizPlugin extends Plugin {
       bestDays: wrap(this.bestDays),
       dailyToday: wrap(this.dailyToday),
       periodTraining: wrap(this.periodTraining),
-      periodHabits: wrap(this.periodHabits),
+      periodHabits: wrap(async function (dv, c, i) {
+        await this.periodHabits(dv, c, i);
+        await this.periodGoals(dv, c, i);
+      }),
+      goals: wrap(this.goals),
+      periodGoals: wrap(this.periodGoals),
       monthCalendar: wrap(this.monthCalendar),
       trainingDashboard: wrap(this.trainingDashboard),
       academicDashboard: wrap(this.academicDashboard),
       courseStatus: wrap(this.courseStatus),
       agenda: wrap(this.agendaView),
       home: wrap(this.home),
+      hub: wrap(this.hub),
+      activity: wrap(async function (dv, c) { await this.activityHeatmap(c); }),
+      pageHeader: wrap(this.pageHeader),
+      pageCard: wrap(this.pageCard),
+      topicTable: wrap(this.topicTable),
       library: wrap(this.library),
       mediaHero: wrap(this.mediaHero),
       workout: wrap(this.workout),
@@ -1775,7 +2135,7 @@ module.exports = class RaizPlugin extends Plugin {
     window.renderChart(config, holder);
   }
   heading(container, text) {
-    return container.createEl('h4', { cls: 'raiz-h', text });
+    return container.createEl('h4', { cls: 'raiz-h', text: deEmoji(text) });
   }
   link(container, file, text) {
     return container.createEl('a', {
@@ -2379,6 +2739,7 @@ module.exports = class RaizPlugin extends Plugin {
       [`Últimas ${weeks} sem`, sessions.length, 'sesiones'],
       ['Marcas nuevas', prs.length, `en ${weeks} semanas`],
     ]);
+    this.goalsDashboard(container);
     this.heading(container, '🗓️ Constancia (últimos 6 meses)');
     await this.trainingHeatmap(container, 26);
     this.heading(container, '📊 Sesiones y volumen por semana');
@@ -2570,6 +2931,13 @@ module.exports = class RaizPlugin extends Plugin {
       this.saveLibState();
       draw();
     });
+    const viewBtn = bar.createEl('button', { cls: 'raiz-chip', text: st.vista === 'tablero' ? 'Ver galería' : 'Ver tablero' });
+    viewBtn.addEventListener('click', () => {
+      st.vista = st.vista === 'tablero' ? 'galeria' : 'tablero';
+      viewBtn.setText(st.vista === 'tablero' ? 'Ver galería' : 'Ver tablero');
+      this.saveLibState();
+      draw();
+    });
     const size = bar.createEl('input', { cls: 'raiz-range', attr: { type: 'range', min: '110', max: '260', step: '10', title: 'Tamaño de portadas' } });
     size.value = String(st.size);
     size.addEventListener('input', () => {
@@ -2609,9 +2977,12 @@ module.exports = class RaizPlugin extends Plugin {
       const avgR = avg(list.map((i) => num(i.fm.puntuacion)));
       summary.setText(`${list.length} ${list.length === 1 ? 'título' : 'títulos'} · ${done} terminados${avgR !== null ? ` · ⭐ ${fmtNum(avgR)} promedio` : ''}`);
       grid.empty();
+      grid.toggleClass('raiz-grid', st.vista !== 'tablero');
+      if (st.vista === 'tablero' && list.length) return this.libraryBoard(grid, list);
       if (!list.length) {
         const empty = grid.createDiv({ cls: 'raiz-empty' });
         empty.createDiv({ text: items.length ? 'Nada coincide con los filtros.' : 'Tu biblioteca está vacía.' });
+        if (items.length) empty.createEl('button', { cls: 'raiz-chip', text: 'Quitar filtros' }).addEventListener('click', () => { Object.assign(st, { q: '', cat: 'todos', estado: 'todos', genero: 'todos', fav: false }); this.saveLibState(); container.empty(); this.library(dv, container, {}); });
         const b = empty.createEl('button', { cls: 'mod-cta', text: '＋ Agregar el primero' });
         b.addEventListener('click', () => new MediaModal(this, st.cat !== 'todos' ? st.cat : cats[0]?.key).open());
         return;
@@ -2696,6 +3067,7 @@ module.exports = class RaizPlugin extends Plugin {
       b.addEventListener('click', () =>
         set((x) => {
           const patch = { estado: s };
+          if (/terminad/i.test(s)) this.celebrate(b);
           if (/curso/i.test(s) && !x.inicio) patch.inicio = isoDate(moment());
           if (/terminad/i.test(s)) {
             if (!x.fin) patch.fin = isoDate(moment());
@@ -2882,6 +3254,8 @@ module.exports = class RaizPlugin extends Plugin {
           fuente: d.url,
         }));
       }
+      case 'youtube':
+        return this.searchYouTube(q);
       case 'tvmaze': {
         const j = await this.getJson(`https://api.tvmaze.com/search/shows?q=${enc}`);
         return (j || []).map(({ show: s }) => ({
@@ -2906,14 +3280,14 @@ module.exports = class RaizPlugin extends Plugin {
       }
     }
   }
-  async downloadCover(url, name, alt) {
+  async downloadCover(url, name, alt, folder) {
     for (const u of [url, alt].filter(Boolean)) {
       try {
         const res = await requestUrl({ url: u, method: 'GET', throw: false });
         const ct = String(res.headers?.['content-type'] || res.headers?.['Content-Type'] || '');
         if (res.status >= 400 || !ct.startsWith('image') || !res.arrayBuffer || res.arrayBuffer.byteLength < 1000) continue;
         const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : ct.includes('gif') ? 'gif' : 'jpg';
-        const dir = `${this.settings.folders.library}/_portadas`;
+        const dir = folder || `${this.settings.folders.library}/_portadas`;
         await this.ensureFolder(dir);
         let path = `${dir}/${safeName(name).slice(0, 80) || 'portada'}.${ext}`;
         let i = 2;
@@ -3123,6 +3497,7 @@ module.exports = class RaizPlugin extends Plugin {
     }
     const playBtn = clock.createEl('button', { cls: 'raiz-chip ' + (running ? 'is-stop' : 'is-go'), text: running ? '⏹ Terminar' : '▶ Empezar' });
     playBtn.addEventListener('click', () => {
+      if (running) this.celebrate(playBtn);
       if (running) setFm({ entrenoFin: moment().format('YYYY-MM-DDTHH:mm'), duracion: Math.max(1, Math.round(moment().diff(startM, 'minutes', true))) });
       else setFm({ entrenoInicio: moment().format('YYYY-MM-DDTHH:mm'), entrenoFin: null });
     });
@@ -3417,6 +3792,7 @@ module.exports = class RaizPlugin extends Plugin {
     const F = this.settings.folders;
     if (f.path.startsWith(F.templates.split('/')[0] + '/')) return false;
     if (f.path.includes('/_portadas/')) return false;
+    if (['README.md', 'TERCEROS.md', 'THIRD_PARTY.md'].includes(f.path)) return false; // documentos del repositorio
     return true;
   }
   /** Texto con frontmatter, código, enlaces, URLs y etiquetas tapados con espacios (los índices no cambian). */
@@ -4239,6 +4615,7 @@ module.exports = class RaizPlugin extends Plugin {
     const show = () => {
       stage.empty();
       if (i >= queue.length) {
+        if (total) this.celebrate(stage);
         stage.createDiv({ cls: 'raiz-empty', text: total ? `🎉 ¡Listo! Repasaste ${total} tarjeta(s).` : '🎉 Nada pendiente por hoy en este tema.' });
         if (ui.mode !== 'certamen' && pool.length) {
           stage.createEl('button', { cls: 'raiz-chip', text: '🔁 Practicar todo el tema igual' }).addEventListener('click', () => {
@@ -4318,7 +4695,11 @@ module.exports = class RaizPlugin extends Plugin {
     };
   }
   mbButton(id, label, actionYaml, style = 'primary') {
-    return ['```meta-bind-button', `id: ${id}`, `label: ${JSON.stringify(label)}`, `style: ${style}`, 'class: raiz-btn', 'hidden: true', 'actions:', actionYaml, '```'].join('\n');
+    const icons = { '⚡': 'zap', '⭐': 'star', '🏷️': 'tag', '✨': 'sparkles', '🔎': 'search', '🎯': 'target', '💡': 'lightbulb', '🌟': 'sun', '🔭': 'telescope', '📥': 'inbox', '📅': 'calendar-plus', '🎓': 'graduation-cap', '🏋️': 'dumbbell', '➕': 'plus', '🧠': 'brain', '🔗': 'link', '🃏': 'layers' };
+    const m = String(label).match(/^([\p{Extended_Pictographic}\uFE0F\u200D]+)\s*/u);
+    const icon = m ? icons[m[1]] || icons[m[1].replace(/\uFE0F/g, '')] : null;
+    if (m) label = label.slice(m[0].length);
+    return ['```meta-bind-button', `id: ${id}`, `label: ${JSON.stringify(label)}`, ...(icon ? [`icon: ${icon}`] : []), `style: ${style}`, 'class: raiz-btn', 'hidden: true', 'actions:', actionYaml, '```'].join('\n');
   }
   mbCmd(id, label, cmd, style) {
     return this.mbButton(id, label, `  - type: command\n    command: ${cmd}`, style);
@@ -4341,7 +4722,10 @@ module.exports = class RaizPlugin extends Plugin {
     else if (level === 'quarterly') name = `banner-trimestre-${m.quarter()}`;
     else name = 'banner-anio';
     const file = this.app.vault.getAbstractFileByPath(`${dir}/${name}.svg`);
-    return [`banner: "[[${file ? file.path : name + '.svg'}]]"`, 'banner-y: 50', 'banner-height: 320', 'content-start: 210', 'banner-fade: -75', 'banner-radius: 22'].join('\n');
+    const def = `"[[${file ? file.path : name + '.svg'}]]"`;
+    const own = this.sectionBanner(level);
+    if (own !== null) return [...(own ? [`banner: ${JSON.stringify(own)}`] : []), `banner-original: ${def}`, 'banner-y: 50', 'banner-height: 320', 'content-start: 210', 'banner-fade: -75', 'banner-radius: 22'].join('\n');
+    return [`banner: ${def}`, 'banner-y: 50', 'banner-height: 320', 'content-start: 210', 'banner-fade: -75', 'banner-radius: 22'].join('\n');
   }
   qaBlock(levelName) {
     return [
@@ -4391,10 +4775,12 @@ module.exports = class RaizPlugin extends Plugin {
       body.push(aiRow([['raiz-ia-dia', '⚡ IA: nota + título', 'raiz:ai-day'], ['raiz-ia-nota', '⭐ IA: nota', 'raiz:ai-rate'], ['raiz-ia-titulo', '🏷️ IA: título', 'raiz:ai-title']]));
       body.push('---', '### 🌅 Hoy', this.dvBlock('dailyToday'), '', '### ✅ Tareas', '- [ ] ', '', '### 🏋️ Entrenamiento', this.trainingBlock(), '');
       body.push(
+        '### 🎯 Mis metas',
+        this.dvBlock('goals'),
+        '',
         '### 🌡️ Check-in',
         '- 🙂 **Ánimo** `INPUT[slider(minValue(1), maxValue(5), addLabels):animo]`',
         '- ⚡ **Energía** `INPUT[slider(minValue(1), maxValue(5), addLabels):energia]`',
-        '- 😴 **Sueño** `INPUT[number(placeholder(horas)):sueno]` h · ⚖️ **Peso** `INPUT[number(placeholder(kg)):peso]` kg · 📚 **Estudio** `INPUT[number(placeholder(horas)):horasEstudio]` h',
         this.habitsBlock(),
         '',
         '---',
@@ -4462,7 +4848,8 @@ module.exports = class RaizPlugin extends Plugin {
         body.push('', this.qaBlock({ monthly: 'mes', quarterly: 'trimestre', yearly: 'año' }[level]));
       }
     }
-    return `---\n${fm.join('\n')}\n---\n${body.join('\n')}\n`;
+    const clean = body.join('\n').replace(/^(#{1,6}\s+)(.*)$/gm, (m0, h, t) => h + deEmoji(t)).replace(/^(>\[!\w+\][-+]?\s+)(.*)$/gm, (m0, h, t) => h + deEmoji(t));
+    return `---\n${fm.join('\n')}\n---\n${clean}\n`;
   }
   /** Para Templater: arma la nota según su carpeta. */
   async buildFromTp(tp) {
@@ -4569,6 +4956,1101 @@ module.exports = class RaizPlugin extends Plugin {
     if (!days.length) return container.createDiv({ cls: 'raiz-muted', text: 'Aún no hay días con 9 o 10.' });
     this.table(container, ['Día', 'Título', '⭐'], days.map((d) => [(td) => this.link(td, d.file, fechaCorta(d.date)), d.fm.alias || '—', num(d.fm.valoracion)]));
   }
+  // ═════════════════════════════ Mis metas (agua, comida, pasos, lectura… con tus propios números) ═════════════════════════════
+  activeGoals() {
+    return (this.settings.goals || []).filter((g) => g.on !== false && g.key);
+  }
+  editGoals(after) {
+    new GoalsModal(this, after).open();
+  }
+  goalDecimals(g) {
+    const s = String(g.step ?? 1);
+    return s.includes('.') ? Math.min(3, s.split('.')[1].length) : 0;
+  }
+  fmtGoal(g, v) {
+    if (v === null || v === undefined) return '—';
+    return Number(v).toLocaleString('es-CL', { maximumFractionDigits: Math.max(1, this.goalDecimals(g)) });
+  }
+  /** Anillo de progreso con el ícono al centro. */
+  goalRing(parent, pct, color, icon, size = 52) {
+    const wrap = parent.createDiv({ cls: 'raiz-ring' });
+    wrap.style.width = wrap.style.height = `${size}px`;
+    const svg = wrap.createSvg('svg', { attr: { viewBox: '0 0 48 48' } });
+    const C = 2 * Math.PI * 21;
+    svg.createSvg('circle', { attr: { cx: 24, cy: 24, r: 21, class: 'raiz-ring-bg' } });
+    const fg = svg.createSvg('circle', { attr: { cx: 24, cy: 24, r: 21, class: 'raiz-ring-fg', 'stroke-dasharray': `${(clamp(pct, 0, 1) * C).toFixed(1)} ${C.toFixed(1)}` } });
+    fg.style.stroke = color;
+    const ic = wrap.createDiv({ cls: 'raiz-ring-icon' });
+    setIcon(ic, icon || 'target');
+    if (pct >= 1) wrap.addClass('is-done');
+    return wrap;
+  }
+  /** Último valor registrado antes de una fecha (para las medidas como el peso). */
+  lastMeasure(key, before) {
+    const days = this.dailiesIn(moment(before).subtract(120, 'days'), moment(before).subtract(1, 'day'));
+    for (let i = days.length - 1; i >= 0; i--) if (num(days[i].fm[key]) !== null) return { v: num(days[i].fm[key]), date: days[i].date };
+    return null;
+  }
+  /** Widget de la nota diaria: tus metas con anillos, barras y botones + / −. */
+  async goals(dv, container, input) {
+    let file = this.currentOf(dv);
+    if (this.levelOf(file) !== 'daily') file = this.dailyFor(input.date ? moment(input.date) : moment());
+    const box = container.createDiv({ cls: 'raiz-goals' });
+    if (!file) {
+      box.createDiv({ cls: 'raiz-muted', text: 'Todavía no creas la nota de hoy.' });
+      box.createEl('button', { cls: 'mod-cta', text: 'Crear mi día' }).addEventListener('click', () => this.openToday());
+      return;
+    }
+    const day = this.rangeOf(file)?.start || moment();
+    const vals = {};
+    const goals = this.activeGoals();
+    for (const g of goals) vals[g.key] = num(this.fm(file)[g.key]);
+    const save = async (g, v) => {
+      const before = vals[g.key];
+      if (v !== null) v = Math.max(0, Number(v.toFixed(this.goalDecimals(g))));
+      vals[g.key] = v;
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        if (v === null) delete fm[g.key];
+        else fm[g.key] = v;
+      });
+      draw();
+      if (g.tipo !== 'medida' && g.goal && (before || 0) < g.goal && v >= g.goal) this.celebrate(box.querySelector(`[data-goal="${g.key}"]`) || box);
+    };
+    const editable = (el, g) => {
+      el.addClass('raiz-goal-edit');
+      el.setAttr('aria-label', 'Escribir el valor exacto');
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const inp = createEl('input', { cls: 'raiz-input raiz-goal-input', attr: { type: 'number', step: String(g.step || 1), min: '0' } });
+        inp.value = vals[g.key] ?? '';
+        el.replaceWith(inp);
+        inp.focus();
+        inp.select();
+        let done = false;
+        const commit = () => {
+          if (done) return;
+          done = true;
+          this.run(() => save(g, inp.value === '' ? null : Number(inp.value)));
+        };
+        inp.addEventListener('keydown', (k) => {
+          if (k.key === 'Enter') commit();
+          if (k.key === 'Escape') ((done = true), draw());
+        });
+        inp.addEventListener('blur', commit);
+      });
+    };
+    const stepBtn = (parent, g, dir) => {
+      const b = parent.createEl('button', { cls: 'raiz-goal-btn', attr: { 'aria-label': dir > 0 ? `Sumar ${g.step} ${g.unit || ''}` : `Restar ${g.step}` } });
+      setIcon(b, dir > 0 ? 'plus' : 'minus');
+      b.addEventListener('click', () => {
+        let base = vals[g.key];
+        if (base === null && g.tipo === 'medida') base = this.lastMeasure(g.key, day)?.v ?? null;
+        // Primera vez que se registra una medida: mejor escribir el número que sumar desde cero
+        if (base === null && g.tipo === 'medida') return box.querySelector(`[data-goal="${g.key}"] .raiz-goal-edit`)?.click();
+        this.run(() => save(g, Math.max(0, (base || 0) + dir * (num(g.step) || 1))));
+      });
+    };
+    const draw = () => {
+      box.empty();
+      const top = box.createDiv({ cls: 'raiz-goals-top' });
+      top.createSpan({ cls: 'raiz-goals-title', text: day.isSame(moment(), 'day') ? 'Metas de hoy' : `Metas del ${fechaCorta(day)}` });
+      const done = goals.filter((g) => g.tipo !== 'medida' && g.goal && vals[g.key] >= g.goal).length;
+      const total = goals.filter((g) => g.tipo !== 'medida' && g.goal).length;
+      if (total) top.createSpan({ cls: 'raiz-pill', text: `${done}/${total} cumplidas` });
+      const gear = top.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Editar mis metas' } });
+      setIcon(gear, 'settings-2');
+      gear.addEventListener('click', () => this.editGoals(() => this.goals(dv, (box.remove(), container), input)));
+      if (!this.settings.goalsReviewed) {
+        const hint = box.createDiv({ cls: 'raiz-goals-hint' });
+        hint.createSpan({ text: 'Estos números son solo un ejemplo. Pon los tuyos: qué quieres medir, cuánto y en qué unidad.' });
+        hint.createEl('button', { cls: 'mod-cta', text: 'Ajustar mis metas' }).addEventListener('click', () => gear.click());
+      }
+      if (!goals.length) return box.createDiv({ cls: 'raiz-muted', text: 'No tienes metas activas. Toca el engranaje para crear las tuyas.' });
+      const groups = [];
+      for (const g of goals) {
+        const name = g.group || 'Mis metas';
+        let grp = groups.find((x) => x.name === name);
+        if (!grp) groups.push((grp = { name, items: [] }));
+        grp.items.push(g);
+      }
+      const grid = box.createDiv({ cls: 'raiz-goal-grid' });
+      for (const grp of groups) {
+        const card = grid.createDiv({ cls: 'raiz-goal-card' });
+        card.createDiv({ cls: 'raiz-goal-group', text: grp.name });
+        let bars = null;
+        for (const g of grp.items) {
+          const v = vals[g.key];
+          const color = g.color || 'var(--interactive-accent)';
+          if (g.estilo === 'barra') {
+            if (!bars) bars = card.createDiv({ cls: 'raiz-goal-bars' });
+            const it = bars.createDiv({ cls: 'raiz-goal-bar', attr: { 'data-goal': g.key } });
+            it.createDiv({ cls: 'raiz-goal-bar-label', text: g.label });
+            const track = it.createDiv({ cls: 'raiz-goal-track' });
+            const fill = track.createDiv({ cls: 'raiz-goal-fill' });
+            fill.style.width = `${g.goal ? clamp((v || 0) / g.goal, 0, 1) * 100 : 0}%`;
+            fill.style.background = color;
+            const txt = it.createDiv({ cls: 'raiz-goal-bar-val', text: `${this.fmtGoal(g, v ?? 0)}${g.goal ? '/' + this.fmtGoal(g, g.goal) : ''}${g.unit || ''}` });
+            editable(txt, g);
+            const mini = it.createDiv({ cls: 'raiz-goal-mini' });
+            stepBtn(mini, g, -1);
+            stepBtn(mini, g, 1);
+            continue;
+          }
+          bars = null;
+          const row = card.createDiv({ cls: 'raiz-goal-row', attr: { 'data-goal': g.key } });
+          const medida = g.tipo === 'medida';
+          const pct = medida ? (v !== null ? 1 : 0) : g.goal ? (v || 0) / g.goal : 0;
+          this.goalRing(row, medida ? (v !== null ? 1 : 0) : pct, color, g.icon).toggleClass('is-measure', medida);
+          const info = row.createDiv({ cls: 'raiz-goal-info' });
+          info.createDiv({ cls: 'raiz-goal-label', text: g.label });
+          const sub = info.createDiv({ cls: 'raiz-goal-sub' });
+          if (medida) {
+            const val = sub.createSpan({ text: v !== null ? `${this.fmtGoal(g, v)} ${g.unit || ''}` : 'Sin registrar' });
+            editable(val, g);
+            const last = v === null ? this.lastMeasure(g.key, day) : null;
+            if (last) sub.createSpan({ cls: 'raiz-goal-note', text: ` · último ${this.fmtGoal(g, last.v)} (${fechaCorta(last.date)})` });
+            const ref = v ?? last?.v;
+            if (g.goal && ref !== null && ref !== undefined) sub.createSpan({ cls: 'raiz-goal-note', text: ` · objetivo ${this.fmtGoal(g, g.goal)}` });
+          } else {
+            const val = sub.createSpan({ text: `${this.fmtGoal(g, v ?? 0)}${g.goal ? ' de ' + this.fmtGoal(g, g.goal) : ''} ${g.unit || ''}` });
+            editable(val, g);
+            if (g.goal && v >= g.goal) sub.createSpan({ cls: 'raiz-goal-ok', text: ' · lista' });
+          }
+          const act = row.createDiv({ cls: 'raiz-goal-actions' });
+          stepBtn(act, g, -1);
+          stepBtn(act, g, 1);
+        }
+      }
+    };
+    draw();
+  }
+  /** Resumen de metas de un periodo (o de los últimos días): promedio, días cumplidos y racha. */
+  goalSummary(days) {
+    return this.activeGoals().map((g) => {
+      const vals = days.map((d) => num(d.fm[g.key]));
+      const logged = vals.filter((v) => v !== null);
+      const met = g.goal && g.tipo !== 'medida' ? vals.filter((v) => v !== null && v >= g.goal).length : 0;
+      let streak = 0;
+      for (let i = vals.length - 1; i >= 0; i--) {
+        const ok = vals[i] !== null && vals[i] >= (g.goal || Infinity);
+        if (ok) streak++;
+        else if (i === vals.length - 1 && days[i].date.isSame(moment(), 'day')) continue; // hoy todavía no termina
+        else break;
+      }
+      return { g, logged, avg: avg(logged), met, total: days.length, streak, first: logged[0] ?? null, last: logged[logged.length - 1] ?? null };
+    });
+  }
+  goalSummaryCards(container, days) {
+    const rows = this.goalSummary(days).filter((r) => r.logged.length);
+    if (!rows.length) return container.createDiv({ cls: 'raiz-muted', text: 'Aún no registras tus metas en este periodo. Usa los botones + en tu nota diaria.' });
+    const grid = container.createDiv({ cls: 'raiz-goal-sum' });
+    for (const r of rows) {
+      const { g } = r;
+      const c = grid.createDiv({ cls: 'raiz-goal-sum-card' });
+      const medida = g.tipo === 'medida' || !g.goal;
+      this.goalRing(c, medida ? 1 : r.met / r.total, g.color || 'var(--interactive-accent)', g.icon, 46).toggleClass('is-measure', medida);
+      const info = c.createDiv({ cls: 'raiz-goal-info' });
+      info.createDiv({ cls: 'raiz-goal-label', text: g.label });
+      if (medida) {
+        const diff = r.last !== null && r.first !== null ? r.last - r.first : null;
+        info.createDiv({ cls: 'raiz-goal-sub', text: `${this.fmtGoal(g, r.last)} ${g.unit || ''}${diff ? ` (${diff > 0 ? '+' : ''}${this.fmtGoal(g, diff)})` : ''}` });
+        if (g.goal) info.createDiv({ cls: 'raiz-goal-note', text: `objetivo ${this.fmtGoal(g, g.goal)} ${g.unit || ''}` });
+      } else {
+        info.createDiv({ cls: 'raiz-goal-sub', text: `${r.met}/${r.total} días · promedio ${this.fmtGoal(g, r.avg)} ${g.unit || ''}` });
+        if (r.streak > 1) info.createDiv({ cls: 'raiz-goal-ok', text: `racha de ${r.streak} días` });
+      }
+    }
+  }
+  async periodGoals(dv, container) {
+    const { start, end } = this.currentRange(dv);
+    const days = this.dailiesIn(start, end).filter((d) => !d.date.isAfter(moment(), 'day'));
+    if (!days.length || !this.activeGoals().length) return;
+    this.heading(container, 'Metas');
+    this.goalSummaryCards(container, days);
+  }
+  /** Bloque de metas del panel de entrenamiento: última semana y evolución de la meta que elijas. */
+  goalsDashboard(container) {
+    const goals = this.activeGoals();
+    if (!goals.length) return;
+    const head = this.heading(container, 'Tus metas · últimos 7 días');
+    const gear = head.createEl('button', { cls: 'clickable-icon raiz-h-btn', attr: { 'aria-label': 'Editar mis metas' } });
+    setIcon(gear, 'settings-2');
+    gear.addEventListener('click', () => this.editGoals());
+    const today = moment();
+    this.goalSummaryCards(container, this.dailiesIn(today.clone().subtract(6, 'days'), today));
+    const days = this.dailiesIn(today.clone().subtract(29, 'days'), today);
+    const withData = goals.filter((g) => days.some((d) => num(d.fm[g.key]) !== null));
+    if (!withData.length) return;
+    this.heading(container, 'Evolución (30 días)');
+    const sel = container.createEl('select', { cls: 'dropdown raiz-goal-select' });
+    for (const g of withData) sel.createEl('option', { value: g.key, text: g.label });
+    const holder = container.createDiv();
+    const draw = () => {
+      holder.empty();
+      const g = withData.find((x) => x.key === sel.value) || withData[0];
+      const datasets = [{ label: `${g.label}${g.unit ? ` (${g.unit})` : ''}`, data: days.map((d) => num(d.fm[g.key])), borderColor: g.color || '#22c55e', backgroundColor: (g.color || '#22c55e') + '33', fill: true, spanGaps: true, tension: 0.3 }];
+      if (g.goal) datasets.push({ label: 'Objetivo', data: days.map(() => g.goal), borderColor: 'rgba(148,163,184,0.7)', borderDash: [6, 6], pointRadius: 0, fill: false });
+      this.renderChart(holder, { type: 'line', data: { labels: days.map((d) => `${d.date.date()}/${d.date.month() + 1}`), datasets }, options: { scales: { y: { beginAtZero: g.tipo !== 'medida' } } } });
+    };
+    sel.addEventListener('change', draw);
+    draw();
+  }
+
+  // ═════════════════════════════ Fondos por apartado ═════════════════════════════
+  sections() {
+    const F = this.settings.folders;
+    return [
+      { key: 'daily', label: 'Notas diarias', level: 'daily' },
+      { key: 'weekly', label: 'Semanas', level: 'weekly' },
+      { key: 'monthly', label: 'Meses', level: 'monthly' },
+      { key: 'quarterly', label: 'Trimestres', level: 'quarterly' },
+      { key: 'yearly', label: 'Años', level: 'yearly' },
+      { key: 'academic', label: 'Académico', folder: F.academic },
+      { key: 'training', label: 'Entrenamiento', folder: F.training },
+      { key: 'agenda', label: 'Agenda', folder: F.agenda },
+      { key: 'library', label: 'Biblioteca', folder: F.library },
+      { key: 'knowledge', label: 'Conocimiento', folder: F.knowledge },
+      { key: 'dashboard', label: 'Inicio y paneles', folder: F.dashboard },
+      { key: 'inbox', label: 'Bandeja', folder: F.inbox },
+    ];
+  }
+  sectionOf(file) {
+    if (!file) return null;
+    const level = this.levelOf(file);
+    return this.sections().find((s) => (level ? s.level === level : s.folder && file.path.startsWith(s.folder + '/'))) || null;
+  }
+  sectionBanner(key) {
+    const v = this.settings.sectionBanners?.[key];
+    return typeof v === 'string' ? v : null;
+  }
+  /** Cambia el fondo de una nota guardando el original para poder restaurarlo. value: imagen, '' = sin imagen, null = original. */
+  async setBanner(file, value) {
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      if (value === null) {
+        if (!('banner-original' in fm)) return;
+        if (fm['banner-original']) fm.banner = fm['banner-original'];
+        else delete fm.banner;
+        delete fm['banner-original'];
+        return;
+      }
+      if (!('banner-original' in fm)) fm['banner-original'] = fm.banner || '';
+      if (value) {
+        fm.banner = value;
+        fm['banner-height'] = fm['banner-height'] || 260;
+        fm['content-start'] = fm['content-start'] || 190;
+        fm['banner-fade'] = fm['banner-fade'] ?? -70;
+        fm['banner-radius'] = fm['banner-radius'] ?? 16;
+      } else delete fm.banner;
+    });
+  }
+  async applySectionBanner(section, value) {
+    this.settings.sectionBanners = this.settings.sectionBanners || {};
+    if (value === null) delete this.settings.sectionBanners[section.key];
+    else this.settings.sectionBanners[section.key] = value;
+    await this.saveSettings();
+    const banners = this.settings.folders.banners + '/';
+    const files = this.app.vault.getMarkdownFiles().filter((f) => this.sectionOf(f)?.key === section.key && this.isContentFile(f));
+    let n = 0;
+    for (const f of files) {
+      const fm = this.fm(f);
+      const cur = String(fm.banner || '');
+      // En las carpetas solo se tocan las notas con fondo de Raíz o puesto por el apartado; tus portadas propias se respetan
+      const target = this.app.metadataCache.getFirstLinkpathDest(cur.replace(/^!?\[\[|\]\]$/g, '').split('|')[0], f.path);
+      const ours = section.level || 'banner-original' in fm || cur.includes(banners) || !!target?.path.startsWith(banners);
+      if (!ours || (value === null && !('banner-original' in fm))) continue;
+      await this.setBanner(f, value);
+      n++;
+    }
+    new Notice(value === null ? `${section.label}: fondo original restaurado (${n} notas).` : `${section.label}: fondo cambiado en ${n} notas y en las que vengan.`);
+  }
+
+  // ═════════════════════════════ Estudio estilo Notion: páginas, subpáginas y apuntes ═════════════════════════════
+  studyKinds() {
+    return {
+      area: { label: 'Área', icon: 'graduation-cap' },
+      coleccion: { label: 'Colección', icon: 'table' },
+      asignatura: { label: 'Asignatura', icon: 'book-open' },
+      habilidad: { label: 'Habilidad', icon: 'puzzle' },
+      tema: { label: 'Tema', icon: 'layers' },
+      apunte: { label: 'Apunte', icon: 'notebook-pen' },
+      concepto: { label: 'Concepto', icon: 'lightbulb' },
+    };
+  }
+  isStudyPage(f) {
+    const fm = this.fm(f);
+    return hasTipo(fm, 'estudio') || hasTipo(fm, 'asignatura');
+  }
+  studyPages() {
+    return this.app.vault.getMarkdownFiles().filter((f) => this.isStudyPage(f));
+  }
+  linkTarget(v) {
+    const s = String(toArr(v)[0] || '').replace(/^\[\[|\]\]$/g, '').split('|')[0].trim();
+    if (!s) return null;
+    return this.app.metadataCache.getFirstLinkpathDest(s, '') || null;
+  }
+  breadcrumb(file) {
+    const chain = [];
+    let cur = this.linkTarget(this.fm(file).padre);
+    const seen = new Set([file.path]);
+    while (cur && !seen.has(cur.path) && chain.length < 6) {
+      chain.unshift(cur);
+      seen.add(cur.path);
+      cur = this.linkTarget(this.fm(cur).padre);
+    }
+    return chain;
+  }
+  childrenOf(file) {
+    return this.studyPages().filter((f) => this.linkTarget(this.fm(f).padre)?.path === file.path);
+  }
+  /** Crea una página de estudio (área, asignatura, habilidad, tema, apunte o concepto). */
+  newStudyPage(preset = {}) {
+    const kinds = this.studyKinds();
+    const parents = ['(ninguna)'].concat(this.studyPages().map((f) => f.basename).sort((a, b) => a.localeCompare(b, 'es')));
+    new FormModal(
+      this.app,
+      'Nueva página de estudio',
+      [
+        { key: 'titulo', label: 'Título', required: true, value: preset.titulo || '', placeholder: 'Ej: Heap y Stack en C++' },
+        { key: 'clase', label: 'Tipo', type: 'select', options: Object.values(kinds).map((k) => k.label), value: kinds[preset.clase]?.label || 'Apunte' },
+        { key: 'padre', label: 'Dentro de', type: 'select', options: preset.padre && !parents.includes(preset.padre) ? [preset.padre].concat(parents) : parents, value: preset.padre || '(ninguna)' },
+        { key: 'categoria', label: 'Categoría', value: preset.categoria || '', placeholder: 'Ej: Lenguaje, Matemáticas, Redes…' },
+      ],
+      (v) => this.run(() => this.createStudyPage(v))
+    ).open();
+  }
+  /** Qué tipo de página se crea por defecto dentro de cada tipo. */
+  childKindOf(fm) {
+    return { area: 'coleccion', coleccion: 'asignatura', asignatura: 'apunte', habilidad: 'apunte', tema: 'apunte', apunte: 'apunte', concepto: 'concepto' }[fm.clase] || 'apunte';
+  }
+  async studyPageContent(v) {
+    const kinds = this.studyKinds();
+    const key = Object.keys(kinds).find((k) => kinds[k].label === v.clase || k === v.clase) || 'apunte';
+    const padre = v.padre && v.padre !== '(ninguna)' ? this.app.vault.getMarkdownFiles().find((f) => f.basename === v.padre) : null;
+    let numero = '';
+    if (padre && (key === 'apunte' || this.fm(padre).clase === 'coleccion')) numero = Math.max(0, ...this.childrenOf(padre).map((f) => num(this.fm(f).numero) || 0)) + 1;
+    let content = await this.fromTemplate('Pagina', {
+      clase: key,
+      padre: padre ? JSON.stringify(`[[${padre.basename}]]`) : '""',
+      categoria: JSON.stringify(String(v.categoria || '').trim()),
+      icono: kinds[key].icon,
+      numero,
+      fecha: isoDate(moment()),
+      titulo: String(v.titulo).trim(),
+      vistas: key === 'apunte' || key === 'concepto' ? '' : this.childrenBase(key),
+    });
+    // Las propiedades propias de las hermanas (ej. "revisado") se heredan vacías, como el esquema de una base
+    const schema = Object.entries(this.siblingSchema(padre));
+    if (schema.length) {
+      const lines = schema.map(([k, val]) => `${/^[\w-]+$/.test(k) ? k : JSON.stringify(k)}:${val === false ? ' false' : Array.isArray(val) ? ' []' : ''}`).join('\n');
+      content = content.replace(/\ntags:\n/, () => `\n${lines}\ntags:\n`);
+    }
+    const bg = this.sectionBanner('academic');
+    if (bg) content = content.replace(/^---\n/, () => `---\nbanner: ${JSON.stringify(bg)}\nbanner-original: ""\nbanner-height: 260\ncontent-start: 190\nbanner-fade: -70\nbanner-radius: 16\n`);
+    return { content: content.replace(/\n{3,}/g, '\n\n'), padre };
+  }
+  async createStudyPage(v, opts = {}) {
+    const { content, padre } = await this.studyPageContent(v);
+    const dir = padre ? padre.parent.path : `${this.settings.folders.academic}/Estudio`;
+    return this.createNote(dir, v.titulo, content, opts.open !== false);
+  }
+  /** "Nueva entrada" de una base: crea la subpágina de la nota abierta y la abre. */
+  newChild() {
+    const host = this.activeFile();
+    const kinds = this.studyKinds();
+    new FormModal(
+      this.app,
+      `Nueva entrada en ${host.basename}`,
+      [
+        { key: 'titulo', label: 'Título', required: true, placeholder: 'Ej: Spring orientado al desarrollo web' },
+        { key: 'clase', label: 'Tipo', type: 'select', options: Object.values(kinds).map((k) => k.label), value: kinds[this.childKindOf(this.fm(host))].label },
+      ],
+      (v) => this.run(() => this.createStudyPage({ titulo: v.titulo, clase: v.clase, padre: host.basename, categoria: '' }))
+    ).open();
+  }
+  /** Tabla incrustada (Bases) con las subpáginas, con vistas como en Notion. */
+  childrenBase(kind, title) {
+    const isCourse = kind === 'asignatura' || kind === 'habilidad' || kind === 'coleccion';
+    const order = kind === 'coleccion' ? ['file.name', 'numero', 'revisado', 'estado', 'importancia', 'resumen'] : isCourse ? ['file.name', 'numero', 'fecha', 'estado', 'importancia', 'resumen'] : ['file.name', 'clase', 'categoria', 'estado', 'importancia', 'resumen'];
+    const y = (arr) => arr.map((x) => `      - ${x}`).join('\n');
+    return [
+      `## ${title || (kind === 'coleccion' ? 'Entradas' : isCourse ? 'Notas de clase' : 'Contenido')}`,
+      '```meta-bind-button',
+      'label: "Nueva entrada"',
+      'icon: plus',
+      'style: default',
+      'class: raiz-btn raiz-new-entry',
+      'actions:',
+      '  - type: command',
+      '    command: raiz:new-child',
+      '```',
+      '```base',
+      'properties:',
+      '  file.name:',
+      '    displayName: Página',
+      '  note.clase:',
+      '    displayName: Tipo',
+      '  note.categoria:',
+      '    displayName: Categoría',
+      '  note.estado:',
+      '    displayName: Estado',
+      '  note.importancia:',
+      '    displayName: Importancia',
+      '  note.numero:',
+      '    displayName: N°',
+      '  note.fecha:',
+      '    displayName: Fecha',
+      '  note.resumen:',
+      '    displayName: Resumen',
+      '  note.revisado:',
+      '    displayName: Revisado',
+      'filters:',
+      '  and:',
+      '    - tipo == "estudio"',
+      '    - if(padre.isType("link"), padre.linksTo(this.file), false)',
+      'views:',
+      '  - type: table',
+      `    name: ${isCourse ? 'Todas las notas' : 'Todo'}`,
+      '    order:',
+      y(order),
+      '    sort:',
+      `      - property: ${isCourse ? 'numero' : 'file.name'}`,
+      '        direction: ASC',
+      '  - type: table',
+      `    name: ${kind === 'coleccion' ? 'Por número de curso' : isCourse ? 'Por número de clase' : 'Por categoría'}`,
+      '    order:',
+      y(isCourse ? ['numero', 'file.name', 'fecha', 'estado'] : ['file.name', 'clase', 'estado']),
+      '    groupBy:',
+      `      property: ${isCourse ? 'estado' : 'categoria'}`,
+      '      direction: ASC',
+      '    sort:',
+      `      - property: ${isCourse ? 'numero' : 'file.name'}`,
+      '        direction: ASC',
+      '  - type: cards',
+      '    name: Tarjetas',
+      '    order:',
+      y(['file.name', 'categoria', 'estado']),
+      '    image: note.banner',
+      '    imageFit: cover',
+      '    cardSize: 200',
+      '  - type: list',
+      '    name: Lista simple',
+      '    order:',
+      y(['file.name']),
+      '```',
+    ].join('\n');
+  }
+
+  // ═════════════════════════════ Todo dentro de cualquier nota (estilo Notion) ═════════════════════════════
+  /** Propiedades que comparten las entradas hermanas (como el "esquema" de una base de Notion). */
+  siblingSchema(padre) {
+    const skip = new Set(['tipo', 'clase', 'padre', 'categoria', 'estado', 'importancia', 'numero', 'fecha', 'icono', 'resumen', 'tags', 'cssclasses', 'banner', 'banner-y', 'banner-height', 'content-start', 'banner-fade', 'banner-radius', 'position']);
+    const schema = {};
+    for (const f of padre ? this.childrenOf(padre) : []) {
+      for (const [k, v] of Object.entries(this.fm(f))) {
+        if (skip.has(k) || k in schema) continue;
+        schema[k] = typeof v === 'boolean' ? false : Array.isArray(v) ? [] : null;
+      }
+    }
+    return schema;
+  }
+  /** Crea una subpágina de la nota actual y deja su enlace donde está el cursor. */
+  async insertSubpage(preset = {}) {
+    const host = this.activeFile();
+    const fm = this.fm(host);
+    const childKind = preset.clase || this.childKindOf(fm);
+    const kinds = this.studyKinds();
+    new FormModal(
+      this.app,
+      'Nueva página dentro de esta',
+      [
+        { key: 'titulo', label: 'Título', required: true, placeholder: 'Ej: Microservicios 27/03' },
+        { key: 'clase', label: 'Tipo', type: 'select', options: Object.values(kinds).map((k) => k.label), value: kinds[childKind].label },
+      ],
+      (v) =>
+        this.run(async () => {
+          const f = await this.createStudyPage({ titulo: v.titulo, clase: v.clase, padre: host.basename, categoria: '' }, { open: false });
+          await this.insertAtCursorOrEnd(host, `[[${f.basename}]]`);
+          new Notice(`Página creada: ${f.basename}`);
+        })
+    ).open();
+  }
+  /** Inserta una base (tabla con vistas) con las subpáginas de esta nota y un botón para agregar entradas. */
+  async insertChildrenBase() {
+    const host = this.activeFile();
+    new FormModal(this.app, 'Nueva base en esta página', [{ key: 'nombre', label: 'Nombre de la base', required: true, value: 'Notas de clase' }], (v) =>
+      this.run(async () => {
+        const block = this.childrenBase('coleccion', v.nombre.trim());
+        await this.insertAtCursorOrEnd(host, block);
+        // Si la nota no era de estudio, se le dan las propiedades mínimas para que todo funcione
+        await this.app.fileManager.processFrontMatter(host, (fm) => {
+          if (!fm.tipo) fm.tipo = 'estudio';
+          if (!fm.clase) fm.clase = 'coleccion';
+          if (!fm.icono) fm.icono = 'table';
+        });
+      })
+    ).open();
+  }
+  /** Tarjeta visual que enlaza a otra página (portada, ícono, título y resumen). */
+  async insertPageCard() {
+    const host = this.activeFile();
+    const files = this.app.vault.getMarkdownFiles().filter((f) => f !== host && this.isContentFile(f)).sort((a, b) => b.stat.mtime - a.stat.mtime);
+    new FilePicker(this.app, files, 'Elige la página a mostrar como tarjeta…', (f) =>
+      this.run(() => this.insertAtCursorOrEnd(host, `\`\`\`dataviewjs\nif (window.raiz) await window.raiz.charts.pageCard(dv, this.container, { ruta: ${JSON.stringify(f.path)} });\n\`\`\``))
+    ).open();
+  }
+  async pageCard(dv, container, input) {
+    const f = this.app.vault.getAbstractFileByPath(input.ruta) || this.app.metadataCache.getFirstLinkpathDest(String(input.ruta || ''), dv.currentFilePath);
+    if (!(f instanceof TFile)) return container.createDiv({ cls: 'raiz-muted', text: `No encuentro "${input.ruta}".` });
+    const fm = this.fm(f);
+    const card = container.createDiv({ cls: 'raiz-page-card' });
+    const cover = card.createDiv({ cls: 'raiz-page-card-cover' });
+    const src = this.imageSrc(String(fm.banner || '').replace(/^"|"$/g, ''));
+    if (src) cover.style.backgroundImage = `url("${src}")`;
+    const ic = card.createDiv({ cls: 'raiz-page-card-icon' });
+    const icon = String(fm.icono || '').trim();
+    if (/\p{Extended_Pictographic}/u.test(icon)) ic.setText(icon);
+    else setIcon(ic, icon || 'file-text');
+    const crumbs = this.breadcrumb(f).map((x) => x.basename);
+    if (crumbs.length) card.createDiv({ cls: 'raiz-page-card-crumbs', text: crumbs.slice(-2).join(' / ') });
+    card.createDiv({ cls: 'raiz-page-card-title', text: f.basename });
+    if (fm.resumen) card.createDiv({ cls: 'raiz-page-card-sub', text: String(fm.resumen) });
+    const kids = this.childrenOf(f).length;
+    if (kids) card.createDiv({ cls: 'raiz-page-card-sub', text: `${kids} página(s) dentro` });
+    card.addEventListener('click', () => this.app.workspace.openLinkText(f.path, dv.currentFilePath, false));
+  }
+  /** Lista de módulos que se pueden insertar en cualquier nota. */
+  moduleDefs() {
+    const m = (fn, args) => `\`\`\`dataviewjs\nif (window.raiz) await window.raiz.charts.${fn}(dv, this.container${args ? ', ' + args : ''}); else dv.paragraph("Cargando…");\n\`\`\``;
+    return [
+      ['Cabecera de página (ícono, portada, importancia)', m('pageHeader')],
+      ['Mis metas de hoy (agua, comida, pasos…)', m('goals')],
+      ['Hoy: agenda, clases, evaluaciones y pendientes', m('dailyToday', '{ date: moment().format("YYYY-MM-DD") }')],
+      ['Calendario del mes', m('monthCalendar', '{ month: moment().format("YYYY-MM") }')],
+      ['Próximos 60 días (agenda)', m('agenda')],
+      ['Tareas pendientes de todos los días', '```dataview\nTASK\nFROM "01 Daily"\nWHERE !completed AND text != ""\nGROUP BY file.link\n```'],
+      ['Biblioteca (galería o tablero)', m('library')],
+      ['Biblioteca: solo una categoría (cambia "anime")', m('library', '{ categoria: "anime" }')],
+      ['Panel académico (horario y promedios)', m('academicDashboard')],
+      ['Panel de entrenamiento', m('trainingDashboard')],
+      ['Repaso de tarjetas', m('review')],
+      ['Bandeja de entrada', m('inbox')],
+      ['Conocimiento: mapas, huérfanas y temas', m('knowledgeHome')],
+      ['Notas que enlazan a esta, ordenables por importancia', m('topicTable')],
+      ['Mapa de contenido de esta nota', m('moc')],
+      ['Etiquetas', m('tags')],
+      ['Mapa de actividad del año', m('activity')],
+      ['Inicio completo (reloj, tarjetas, frase…)', m('hub')],
+    ];
+  }
+  insertModule() {
+    const host = this.activeFile();
+    const defs = this.moduleDefs();
+    new StringPicker(this.app, defs.map((d) => d[0]), 'Insertar módulo…', (label) => this.run(() => this.insertAtCursorOrEnd(host, defs.find((d) => d[0] === label)[1]))).open();
+  }
+  /** Da a cualquier nota las propiedades de página (ícono, portada, importancia, subpáginas) sin tocar su contenido. */
+  async makePage(file) {
+    file = file || this.activeFile();
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      if (!fm.tipo) fm.tipo = 'estudio';
+      if (!fm.clase) fm.clase = 'tema';
+      if (!fm.icono) fm.icono = 'file-text';
+      if (fm.importancia === undefined) fm.importancia = null;
+      if (!fm.cssclasses) fm.cssclasses = ['raiz-estudio'];
+    });
+    const txt = await this.app.vault.read(file);
+    if (!txt.includes('charts.pageHeader')) {
+      await this.app.vault.process(file, (d) => {
+        const m = d.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+        const head = m ? m[0] : '';
+        return head + '```dataviewjs\nif (window.raiz) await window.raiz.charts.pageHeader(dv, this.container); else dv.paragraph("Cargando…");\n```\n\n' + d.slice(head.length);
+      });
+    }
+    new Notice('Ahora es una página: ícono, portada, importancia y subpáginas disponibles.');
+  }
+  insertMenu(evt) {
+    const m = new Menu();
+    const add = (title, icon, fn) => m.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => this.run(fn)));
+    add('Nueva página dentro de esta', 'file-plus', () => this.insertSubpage());
+    add('Base con vistas (subpáginas)', 'table', () => this.insertChildrenBase());
+    add('Tarjeta de otra página', 'square-stack', () => this.insertPageCard());
+    add('Módulo (agenda, biblioteca, repaso…)', 'layout-grid', () => this.insertModule());
+    m.addSeparator();
+    add('Convertir esta nota en página', 'file-cog', () => this.makePage());
+    if (evt && evt.clientX !== undefined) m.showAtMouseEvent(evt);
+    else m.showAtPosition({ x: window.innerWidth / 2, y: window.innerHeight / 3 });
+  }
+  /** Un enlace nuevo [[...]] escrito en una página crea su nota como subpágina, junto a ella. */
+  async onLinkedNoteCreated(file) {
+    if (!this.settings.autoSubpages || !(file instanceof TFile) || file.extension !== 'md') return;
+    if (!this.layoutReadyAt || Date.now() - this.layoutReadyAt < 4000) return;
+    const host = this.app.workspace.getActiveFile(); // la página donde se hizo clic (antes de que se abra la nueva)
+    await new Promise((r) => setTimeout(r, 400));
+    if ((await this.app.vault.read(file)).trim()) return; // ya tiene contenido (plantilla u otra cosa)
+    if (this.levelOf(file) || file.path.startsWith(this.settings.folders.inbox + '/')) return;
+    if (!host || host === file || !this.isStudyPage(host)) return;
+    const unresolved = this.app.metadataCache.unresolvedLinks[host.path] || {};
+    const resolved = this.app.metadataCache.resolvedLinks[host.path] || {};
+    if (!(file.basename in unresolved) && !(file.path in resolved)) return;
+    const { content } = await this.studyPageContent({ titulo: file.basename, clase: this.childKindOf(this.fm(host)), padre: host.basename, categoria: '' });
+    await this.app.vault.modify(file, content);
+    // Se guarda junto a su página madre (los enlaces se actualizan solos)
+    const dest = `${host.parent.path}/${file.name}`;
+    if (file.parent.path !== host.parent.path && !this.app.vault.getAbstractFileByPath(dest)) await this.app.fileManager.renameFile(file, dest);
+  }
+
+  /** Cabecera de una página de estudio: migas de pan, ícono, importancia y acciones. */
+  async pageHeader(dv, container) {
+    const file = this.currentOf(dv);
+    const fm = this.fm(file);
+    const set = (patch) => this.app.fileManager.processFrontMatter(file, (x) => Object.assign(x, patch));
+    const head = container.createDiv({ cls: 'raiz-page-head' });
+    const crumbs = this.breadcrumb(file);
+    if (crumbs.length) {
+      const bc = head.createDiv({ cls: 'raiz-crumbs' });
+      crumbs.forEach((c, i) => {
+        if (i) bc.createSpan({ cls: 'raiz-crumb-sep', text: '/' });
+        this.link(bc, c, c.basename);
+      });
+    }
+    const top = head.createDiv({ cls: 'raiz-page-top' });
+    const icon = top.createEl('button', { cls: 'raiz-page-icon', attr: { 'aria-label': 'Cambiar ícono' } });
+    const ic = String(fm.icono || '').trim();
+    if (/\p{Extended_Pictographic}/u.test(ic)) icon.setText(ic);
+    else setIcon(icon, ic || this.studyKinds()[fm.clase]?.icon || 'file-text');
+    icon.addEventListener('click', () => new IconModal(this, (v) => set({ icono: v })).open());
+    const meta = top.createDiv({ cls: 'raiz-page-meta' });
+    const kind = this.studyKinds()[fm.clase];
+    if (kind) meta.createSpan({ cls: 'raiz-pill', text: kind.label });
+    if (fm.categoria) meta.createSpan({ cls: 'raiz-pill', text: String(fm.categoria) });
+    if (fm.numero) meta.createSpan({ cls: 'raiz-pill', text: fm.clase === 'apunte' ? `Clase ${fm.numero}` : `N° ${fm.numero}` });
+    const stars = meta.createSpan({ cls: 'raiz-stars', attr: { 'aria-label': 'Importancia' } });
+    const imp = num(fm.importancia) || 0;
+    for (let i = 1; i <= 5; i++) {
+      const s = stars.createEl('button', { cls: 'raiz-star' + (i <= imp ? ' is-on' : ''), attr: { 'aria-label': `Importancia ${i}` } });
+      setIcon(s, 'star');
+      s.addEventListener('click', () => set({ importancia: imp === i ? null : i }));
+    }
+    const actions = head.createDiv({ cls: 'raiz-page-actions' });
+    const act = (iconId, label, fn) => {
+      const b = actions.createEl('button', { cls: 'raiz-chip raiz-act' });
+      setIcon(b.createSpan(), iconId);
+      b.createSpan({ text: label });
+      b.addEventListener('click', (e) => this.run(() => fn(e)));
+      return b;
+    };
+    act('image', 'Fondo', () => new BackgroundModal(this, file).open());
+    if (fm.clase !== 'apunte' && fm.clase !== 'concepto') act('file-plus', ['asignatura', 'habilidad'].includes(fm.clase) ? 'Nueva nota de clase' : fm.clase === 'coleccion' ? 'Nueva entrada' : 'Nueva subpágina', () => this.newChild());
+    act('plus', 'Insertar', (e) => this.insertMenu(e));
+    act('sparkles', 'IA', (e) => this.aiMenu(e, file));
+    act('git-fork', 'Grafo local', () => this.openLocalGraph());
+    act('link', 'Conexiones', () => this.openConnections());
+  }
+  aiMenu(evt, file) {
+    const m = new Menu();
+    const add = (title, icon, fn) => m.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => this.run(fn)));
+    add('Redactar apunte a partir del título', 'pen-line', () => this.aiDraft(file));
+    add('Explicar la selección', 'message-square-text', () => this.aiOnSelection('explicar'));
+    add('Mejorar la redacción de la selección', 'wand-2', () => this.aiOnSelection('mejorar'));
+    add('Ejemplo de código del tema', 'code-2', () => this.aiOnSelection('codigo'));
+    add('Resumir en una frase (propiedad "resumen")', 'align-left', () => this.aiSummaryProp(file));
+    add('Sugerir etiquetas de tema', 'tags', () => this.aiTags(file));
+    add('Generar preguntas de repaso', 'layers', () => this.generateCards());
+    m.showAtMouseEvent(evt);
+  }
+  editorOf(file) {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || (file && view.file !== file)) return null;
+    return view.getMode() === 'source' ? view.editor : null;
+  }
+  async insertAtCursorOrEnd(file, text) {
+    const ed = this.editorOf(file);
+    if (ed) {
+      ed.replaceSelection(text);
+      ed.focus();
+    } else await this.app.vault.process(file, (d) => d.replace(/\s*$/, '') + '\n\n' + text + '\n');
+  }
+  async studyContext(file) {
+    const fm = this.fm(file);
+    const crumbs = this.breadcrumb(file).map((f) => f.basename);
+    return `Tema: ${file.basename}${crumbs.length ? `\nUbicación: ${crumbs.join(' > ')}` : ''}${fm.categoria ? `\nCategoría: ${fm.categoria}` : ''}`;
+  }
+  async aiDraft(file) {
+    file = file || this.activeFile();
+    const ctx = await this.studyContext(file);
+    const existing = (await this.noteText(file)).slice(0, 2500);
+    const out = await this.chat({
+      tier: 'deep',
+      temperature: 0.4,
+      maxTokens: 1800,
+      label: 'Redactando el apunte',
+      system: `${this.systemPrompt()}\nEres un tutor universitario de informática y ciencias. Escribes apuntes claros, en español, con tus propias palabras (nada copiado textual).`,
+      prompt:
+        `Escribe un apunte de estudio en markdown sobre el tema indicado. Estructura: una introducción breve; secciones con títulos "###"; listas con las ideas clave en **negrita**; si el tema es de programación, un ejemplo de código comentado; si es de matemáticas o física, la fórmula en LaTeX con $$; termina con "### En resumen" (3 viñetas). No escribas el título principal ni comentarios sobre lo que vas a hacer.` +
+        (existing ? `\nYa escribí esto en la nota; compleméntalo sin repetirlo:\n${existing}` : '') +
+        `\n\n${ctx}`,
+    });
+    const warn = `> [!warning]- Borrador de IA local (${this.modelFor('deep')})
+> Revisa el código, las fórmulas y los datos antes de estudiarlo: un modelo local puede equivocarse. Reescríbelo con tus palabras para que se te quede.`;
+    await this.insertAtCursorOrEnd(file, `${warn}
+
+${out.trim()}`);
+    new Notice('Apunte redactado. Revísalo y ajústalo con tus palabras.');
+  }
+  async aiOnSelection(mode) {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) throw new Error('Abre una nota en modo edición.');
+    const ed = view.editor;
+    const sel = ed.getSelection().trim();
+    const ctx = await this.studyContext(view.file);
+    if (mode !== 'codigo' && !sel) throw new Error('Selecciona primero el texto.');
+    const prompts = {
+      explicar: `Explica de forma simple y con un ejemplo concreto este fragmento de mis apuntes. Máximo 120 palabras, en markdown, sin título.\n\n${ctx}\n\nFRAGMENTO:\n${sel}`,
+      mejorar: `Reescribe este fragmento de mis apuntes para que sea claro, preciso y bien redactado, manteniendo el significado y el formato markdown. Devuelve SOLO el texto reescrito.\n\n${ctx}\n\nFRAGMENTO:\n${sel}`,
+      codigo: `Escribe un ejemplo de código corto y comentado (en español) que ilustre ${sel ? `esto: ${sel}` : 'el tema de la nota'}. Devuelve SOLO un bloque de código markdown con el lenguaje indicado y, debajo, una línea que explique qué muestra.\n\n${ctx}`,
+    };
+    const out = (await this.chat({ tier: 'deep', temperature: 0.2, maxTokens: 900, label: mode === 'codigo' ? 'Escribiendo el ejemplo' : mode === 'mejorar' ? 'Mejorando la redacción' : 'Explicando', prompt: prompts[mode] })).trim();
+    if (mode === 'mejorar') ed.replaceSelection(out);
+    else if (mode === 'explicar') {
+      const end = ed.getCursor('to');
+      ed.replaceRange(`\n\n> [!info] Explicación\n> ${out.replace(/\n/g, '\n> ')}\n`, { line: end.line, ch: ed.getLine(end.line).length });
+    } else {
+      const end = ed.getCursor('to');
+      ed.replaceRange(`\n\n${out}\n`, { line: end.line, ch: ed.getLine(end.line).length });
+    }
+  }
+  async aiSummaryProp(file) {
+    file = file || this.activeFile();
+    const text = await this.noteText(file);
+    if (text.length < 80) throw new Error('Escribe un poco más antes de resumir.');
+    const out = await this.chat({ tier: 'fast', temperature: 0.2, maxTokens: 120, label: 'Resumiendo', schema: { type: 'object', properties: { resumen: { type: 'string' } }, required: ['resumen'] }, prompt: `Resume este apunte en UNA frase de máximo 20 palabras, en español.\n\n${text.slice(0, 5000)}` });
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      fm.resumen = String(out.resumen || '').trim();
+    });
+  }
+  async aiTags(file) {
+    file = file || this.activeFile();
+    const text = await this.noteText(file);
+    const known = this.allTags().filter((t) => /^tema\//.test(t.tag)).map((t) => t.tag.replace(/^tema\//, ''));
+    const out = await this.chat({
+      tier: 'fast',
+      temperature: 0.2,
+      maxTokens: 120,
+      label: 'Buscando etiquetas',
+      schema: { type: 'object', properties: { etiquetas: { type: 'array', items: { type: 'string' }, maxItems: 3 } }, required: ['etiquetas'] },
+      prompt: `Propón de 1 a 3 etiquetas de tema (minúsculas, con guiones, sin #) para este apunte. Si alguna de estas ya existe y calza, úsala: ${known.join(', ') || '(ninguna)'}.\n\nTÍTULO: ${file.basename}\n${text.slice(0, 3000)}`,
+    });
+    const tags = toArr(out.etiquetas).map((t) => `tema/${norm(t).replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')}`).filter((t) => t !== 'tema/');
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      fm.tags = [...new Set(toArr(fm.tags).map(String).concat(tags))];
+    });
+    new Notice(`Etiquetas: ${tags.map((t) => '#' + t).join(' ')}`);
+  }
+  async openLocalGraph() {
+    const file = this.app.workspace.getActiveFile();
+    let leaf = this.app.workspace.getLeavesOfType('localgraph')[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getRightLeaf(false);
+      await leaf.setViewState({ type: 'localgraph', state: file ? { file: file.path } : {}, active: false });
+    }
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  // Bloques listos para insertar (aparecen en el menú "/")
+  blockDefs() {
+    return [
+      ['nota', 'Nota destacada', '> [!note] Nota\n> '],
+      ['importante', 'Importante', '> [!important] Importante\n> '],
+      ['definicion', 'Definición', '> [!abstract] Definición: \n> '],
+      ['ejemplo', 'Ejemplo', '> [!example] Ejemplo\n> '],
+      ['advertencia', 'Ojo / error común', '> [!warning] Ojo\n> '],
+      ['pregunta', 'Pregunta de repaso', '- ❓  ➜ '],
+      ['desplegable', 'Sección desplegable', '> [!tip]- Ver más\n> '],
+      ['codigo', 'Bloque de código', '```cpp\n\n```'],
+      ['ecuacion', 'Ecuación (LaTeX)', '$$\n\n$$'],
+      ['tabla', 'Tabla', '| Concepto | Descripción |\n| --- | --- |\n|  |  |'],
+      ['comparacion', 'Comparación (A vs B)', '| | A | B |\n| --- | --- | --- |\n| Qué es |  |  |\n| Cuándo usar |  |  |\n| Ventajas |  |  |'],
+      ['diagrama', 'Diagrama (Mermaid)', '```mermaid\nflowchart LR\n  A[Inicio] --> B[Paso]\n```'],
+    ];
+  }
+  insertBlock(text) {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) throw new Error('Abre una nota en modo edición.');
+    const ed = view.editor;
+    const cur = ed.getCursor();
+    const prefix = ed.getLine(cur.line).trim() ? '\n' : '';
+    ed.replaceSelection(prefix + text);
+    ed.focus();
+  }
+
+  /** Nota padre de un tema: todas las notas con sus etiquetas, ordenables (fecha, importancia…). */
+  async topicTable(dv, container, input) {
+    const file = this.currentOf(dv);
+    const temas = toArr(this.fm(file).temas).map((t) => String(t).replace(/^#/, '').toLowerCase()).filter(Boolean);
+    const { inc } = this.linkGraph();
+    const set = new Map();
+    for (const f of [...(inc.get(file.path) || [])].map((p) => this.app.vault.getAbstractFileByPath(p))) if (f instanceof TFile && !this.levelOf(f)) set.set(f.path, f);
+    for (const t of temas) for (const f of this.filesWithTag(t)) if (f !== file) set.set(f.path, f);
+    const rows = [...set.values()];
+    if (!rows.length) return container.createDiv({ cls: 'raiz-muted', text: 'Aún no hay notas en este tema.' });
+    this.topicSort = this.topicSort || 'importancia';
+    const bar = container.createDiv({ cls: 'raiz-lib-bar' });
+    const sel = bar.createEl('select', { cls: 'raiz-select dropdown' });
+    for (const [v, t] of [['importancia', 'Por importancia'], ['creada', 'Más recientes'], ['antiguas', 'Más antiguas'], ['modificada', 'Editadas hace poco'], ['titulo', 'Por título']]) sel.createEl('option', { value: v, text: t });
+    sel.value = this.topicSort;
+    const box = container.createDiv();
+    const draw = () => {
+      box.empty();
+      const by = {
+        importancia: (a, b) => (num(this.fm(b).importancia) || 0) - (num(this.fm(a).importancia) || 0) || b.stat.ctime - a.stat.ctime,
+        creada: (a, b) => b.stat.ctime - a.stat.ctime,
+        antiguas: (a, b) => a.stat.ctime - b.stat.ctime,
+        modificada: (a, b) => b.stat.mtime - a.stat.mtime,
+        titulo: (a, b) => a.basename.localeCompare(b.basename, 'es'),
+      }[this.topicSort];
+      this.table(
+        box,
+        ['Nota', 'Importancia', 'Creada', 'Resumen'],
+        rows.sort(by).map((f) => [(td) => this.link(td, f), '★'.repeat(num(this.fm(f).importancia) || 0) || '—', fechaCorta(moment(f.stat.ctime)), String(this.fm(f).resumen || '—').slice(0, 90)])
+      );
+    };
+    sel.addEventListener('change', () => {
+      this.topicSort = sel.value;
+      draw();
+    });
+    bar.createSpan({ cls: 'raiz-muted', text: `${rows.length} notas` });
+    draw();
+  }
+  // ═════════════════════════════ Inicio tipo "hub" ═════════════════════════════
+  spaceFile() {
+    return this.app.vault.getAbstractFileByPath(`${this.settings.folders.dashboard}/Mi espacio.md`);
+  }
+  hubCards() {
+    const def = [
+      { titulo: 'Estructura', imagen: 'banner-semana-2', links: ['Bandeja', 'Agenda', 'Etiquetas'] },
+      { titulo: 'Personal', imagen: 'banner-biblioteca', links: ['Biblioteca', 'Panel de entrenamiento'] },
+      { titulo: 'Estudio', imagen: 'banner-academico', links: ['Panel académico', 'Conocimiento', 'Repaso'] },
+    ];
+    const raw = String(this.settings.hubCards || '').trim();
+    if (!raw) return def;
+    return raw
+      .split('\n')
+      .map((l) => l.split('|').map((x) => x.trim()))
+      .filter((x) => x[0])
+      .map(([titulo, imagen, links]) => ({ titulo, imagen: imagen || '', links: String(links || '').split(',').map((s) => s.replace(/^\[\[|\]\]$/g, '').trim()).filter(Boolean) }));
+  }
+  imageSrc(name) {
+    if (!name) return null;
+    if (/^https?:\/\//.test(name)) return name;
+    const clean = name.replace(/^\[\[|\]\]$/g, '');
+    const f =
+      this.app.vault.getAbstractFileByPath(clean) ||
+      this.app.metadataCache.getFirstLinkpathDest(clean, '') ||
+      this.app.vault.getAbstractFileByPath(`${this.settings.folders.banners}/${clean}.svg`) ||
+      this.app.vault.getAbstractFileByPath(`${this.settings.folders.covers}/${clean}`);
+    return f instanceof TFile ? this.app.vault.getResourcePath(f) : null;
+  }
+  async quoteOfDay() {
+    const f = this.app.vault.getAbstractFileByPath(`${this.settings.folders.dashboard}/Frases.md`);
+    if (!(f instanceof TFile)) return null;
+    const lines = (await this.app.vault.cachedRead(f))
+      .split('\n')
+      .map((l) => l.match(/^\s*[-*]\s+(.+)$/))
+      .filter(Boolean)
+      .map((m) => m[1].trim());
+    if (!lines.length) return null;
+    const day = Math.floor(moment().startOf('day').valueOf() / 86400000);
+    const [text, author] = lines[day % lines.length].split(/\s+—\s+/);
+    return { text: text.replace(/^["“]|["”]$/g, ''), author: author || '' };
+  }
+  async spaceSections() {
+    const f = this.spaceFile();
+    if (!(f instanceof TFile)) return [];
+    const txt = (await this.app.vault.cachedRead(f)).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+    return txt
+      .split(/^## /m)
+      .slice(1)
+      .map((block) => {
+        const [title, ...rest] = block.split('\n');
+        return { title: title.trim(), body: rest.join('\n').trim() };
+      });
+  }
+  async hub(dv, container) {
+    const root = container.createDiv({ cls: 'raiz-hub' });
+    // Reloj y fecha
+    const clock = root.createDiv({ cls: 'raiz-hub-clock' });
+    const time = clock.createDiv({ cls: 'raiz-hub-time' });
+    clock.createDiv({ cls: 'raiz-hub-date', text: fechaLarga(moment()) });
+    const tick = () => time.setText(moment().format('HH:mm:ss'));
+    tick();
+    const iv = setInterval(() => (root.isConnected ? tick() : clearInterval(iv)), 1000);
+    // Tarjetas por área
+    const cards = root.createDiv({ cls: 'raiz-hub-cards' });
+    for (const c of this.hubCards()) {
+      const card = cards.createDiv({ cls: 'raiz-hub-card' });
+      card.createDiv({ cls: 'raiz-hub-card-title', text: c.titulo });
+      const img = card.createDiv({ cls: 'raiz-hub-card-img' });
+      const src = this.imageSrc(c.imagen);
+      if (src) img.style.backgroundImage = `url("${src}")`;
+      const links = card.createDiv({ cls: 'raiz-hub-card-links' });
+      c.links.forEach((name, i) => {
+        if (i) links.createSpan({ cls: 'raiz-crumb-sep', text: '·' });
+        const f = this.app.vault.getMarkdownFiles().find((x) => x.basename === name);
+        if (f) this.link(links, f, name);
+        else links.createSpan({ cls: 'raiz-muted', text: name });
+      });
+    }
+    // Frase del día
+    const q = await this.quoteOfDay();
+    if (q) {
+      const quote = root.createDiv({ cls: 'raiz-hub-quote' });
+      quote.createDiv({ text: `“${q.text}”` });
+      if (q.author) quote.createDiv({ cls: 'raiz-hub-quote-author', text: q.author });
+    }
+    // Metas, rituales y reflexión (se editan en "Mi espacio")
+    const secs = await this.spaceSections();
+    if (secs.length) {
+      const boxes = root.createDiv({ cls: 'raiz-hub-boxes' });
+      for (const s of secs.slice(0, 3)) {
+        const box = boxes.createDiv({ cls: 'raiz-hub-box' });
+        const head = box.createDiv({ cls: 'raiz-hub-box-title' });
+        head.createSpan({ text: s.title });
+        const edit = head.createEl('button', { cls: 'raiz-icon-btn', attr: { 'aria-label': 'Editar' } });
+        setIcon(edit, 'pencil');
+        edit.addEventListener('click', () => this.app.workspace.openLinkText(this.spaceFile().path, '', false));
+        const body = box.createDiv({ cls: 'raiz-hub-box-body' });
+        await MarkdownRenderer.render(this.app, s.body || '—', body, this.spaceFile().path, this);
+      }
+    }
+    // Actividad del año
+    this.heading(root, 'Actividad');
+    await this.activityHeatmap(root);
+  }
+  /** Mapa de calor con las notas creadas o editadas cada día (último año). Clic en un día = sus notas. */
+  async activityHeatmap(container, weeks = 52) {
+    const end = moment().endOf('isoWeek');
+    const start = end.clone().subtract(weeks - 1, 'weeks').startOf('isoWeek');
+    const byDay = new Map();
+    for (const f of this.app.vault.getMarkdownFiles()) {
+      if (!this.isContentFile(f)) continue;
+      for (const t of new Set([moment(f.stat.ctime).format('YYYY-MM-DD'), moment(f.stat.mtime).format('YYYY-MM-DD')])) {
+        if (!byDay.has(t)) byDay.set(t, new Set());
+        byDay.get(t).add(f);
+      }
+    }
+    const max = Math.max(1, ...[...byDay.values()].map((s) => s.size));
+    const wrap = container.createDiv({ cls: 'raiz-heat-wrap' });
+    const months = wrap.createDiv({ cls: 'raiz-heat-months' });
+    months.style.setProperty('--weeks', weeks);
+    const grid = wrap.createDiv({ cls: 'raiz-heat raiz-heat-activity' });
+    grid.style.setProperty('--weeks', weeks);
+    const detail = container.createDiv({ cls: 'raiz-heat-detail' });
+    let lastMonth = -1;
+    for (let w = 0; w < weeks; w++) {
+      const wk = start.clone().add(w, 'weeks');
+      if (wk.month() !== lastMonth) {
+        const m = months.createSpan({ text: cap(MESES[wk.month()].slice(0, 3)) });
+        m.style.gridColumn = String(w + 2);
+        lastMonth = wk.month();
+      }
+      for (let d = 0; d < 7; d++) {
+        const day = wk.clone().add(d, 'days');
+        const set = byDay.get(day.format('YYYY-MM-DD'));
+        const cell = grid.createDiv({ cls: 'raiz-heat-cell' + (set ? ' is-on' : '') + (day.isAfter(moment(), 'day') ? ' is-future' : '') });
+        cell.style.gridRow = String(d + 1);
+        cell.style.gridColumn = String(w + 2);
+        if (set) {
+          cell.style.setProperty('--a', String(0.3 + 0.7 * Math.min(1, set.size / max)));
+          cell.setAttr('title', `${fechaCorta(day)} · ${set.size} nota(s)`);
+          cell.addEventListener('click', () => {
+            detail.empty();
+            detail.createDiv({ cls: 'raiz-moc-title', text: `${fechaLarga(day)} · ${set.size} nota(s)` });
+            for (const f of [...set].sort((a, b) => b.stat.mtime - a.stat.mtime)) this.link(detail.createDiv({ cls: 'raiz-moc-item' }), f);
+          });
+        } else cell.setAttr('title', fechaCorta(day));
+      }
+    }
+    for (let d = 0; d < 7; d += 2) grid.createDiv({ cls: 'raiz-heat-label', text: DIAS[d] }).style.gridRow = String(d + 1);
+    const total = [...byDay.entries()].filter(([k]) => moment(k).isBetween(start, end, 'day', '[]')).length;
+    detail.createDiv({ cls: 'raiz-muted', text: `${total} días activos en el último año · toca un día para ver sus notas` });
+  }
+  async prepareWorkspace() {
+    const ws = this.app.workspace;
+    const ensure = async (type, state = {}) => {
+      let leaf = ws.getLeavesOfType(type)[0];
+      if (!leaf) {
+        leaf = ws.getRightLeaf(true);
+        await leaf.setViewState({ type, state, active: false });
+      }
+      return leaf;
+    };
+    try {
+      await this.app.commands.executeCommandById('journals:open-calendar');
+    } catch (e) {
+      /* calendario opcional */
+    }
+    await ensure('localgraph', this.app.workspace.getActiveFile() ? { file: this.app.workspace.getActiveFile().path } : {});
+    await ensure(CONN_VIEW);
+    ws.rightSplit?.expand?.();
+    new Notice('Espacio listo: calendario, grafo local y conexiones a la derecha.');
+  }
+  /** Pequeña celebración al terminar algo. */
+  celebrate(anchor) {
+    const host = document.body.createDiv({ cls: 'raiz-confetti' });
+    const r = anchor?.getBoundingClientRect?.() || { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+    const colors = ['#a3e635', '#34d399', '#38bdf8', '#a78bfa', '#fbbf24', '#fb7185'];
+    for (let i = 0; i < 28; i++) {
+      const p = host.createDiv({ cls: 'raiz-confetti-bit' });
+      p.style.left = `${r.left + r.width / 2}px`;
+      p.style.top = `${r.top + r.height / 2}px`;
+      p.style.background = colors[i % colors.length];
+      p.style.setProperty('--dx', `${(Math.random() - 0.5) * 320}px`);
+      p.style.setProperty('--dy', `${-80 - Math.random() * 220}px`);
+      p.style.setProperty('--rot', `${Math.random() * 720 - 360}deg`);
+    }
+    setTimeout(() => host.remove(), 1400);
+  }
+
+  // ═════════════════════════════ Tablero por estado (biblioteca y fuentes de aprendizaje) ═════════════════════════════
+  libraryBoard(container, items) {
+    const board = container.createDiv({ cls: 'raiz-board' });
+    for (const estado of this.settings.mediaStates) {
+      const list = items.filter((i) => String(i.fm.estado || this.settings.mediaStates[0]) === estado);
+      const col = board.createDiv({ cls: `raiz-board-col ${this.estadoCls(estado)}` });
+      col.createDiv({ cls: 'raiz-board-head', text: `${estado} · ${list.length}` });
+      for (const i of list) {
+        const card = col.createDiv({ cls: 'raiz-board-card' });
+        card.style.setProperty('--c', i.cat.color);
+        const src = this.coverSrc(i.fm.portada);
+        if (src) card.createDiv({ cls: 'raiz-board-thumb' }).style.backgroundImage = `url("${src}")`;
+        const body = card.createDiv({ cls: 'raiz-board-body' });
+        body.createDiv({ cls: 'raiz-card-title', text: i.fm.titulo || i.file.basename });
+        const dates = [i.fm.inicio && fechaCorta(toMoment(i.fm.inicio)), i.fm.fin && fechaCorta(toMoment(i.fm.fin))].filter(Boolean).join(' → ');
+        if (dates) body.createDiv({ cls: 'raiz-card-sub', text: dates });
+        const r = this.ratingLabel(i.fm.puntuacion);
+        if (num(i.fm.puntuacion) !== null) body.createDiv({ cls: `raiz-rating ${r.cls}`, text: `${fmtNum(num(i.fm.puntuacion))} · ${r.text}` });
+        card.addEventListener('click', () => this.app.workspace.openLinkText(i.file.path, '', false));
+      }
+    }
+  }
+  /** YouTube: pega el link y trae título, canal y miniatura (sin claves). */
+  async searchYouTube(q) {
+    const url = /^https?:\/\//.test(q) ? q : null;
+    if (!url) throw new Error('Pega el enlace del video o curso de YouTube.');
+    const j = await this.getJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`);
+    const id = (url.match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/) || [])[1];
+    return [
+      {
+        titulo: j.title,
+        sub: j.author_name,
+        creador: j.author_name,
+        portada: id ? `https://i.ytimg.com/vi/${id}/maxresdefault.jpg` : j.thumbnail_url,
+        portadaAlt: j.thumbnail_url,
+        fuente: url,
+        plataforma: 'YouTube',
+        generos: [],
+      },
+    ];
+  }
 };
 
 // ───────────────────────────── Ajustes ─────────────────────────────
@@ -4660,9 +6142,20 @@ class RaizSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName('Descanso entre series (segundos)').addText((t) => t.setValue(String(s.restSeconds || 90)).onChange(async (v) => ((s.restSeconds = clamp(parseInt(v, 10) || 90, 10, 600)), await save())));
 
+    containerEl.createEl('h3', { text: 'Inicio' });
+    new Setting(containerEl)
+      .setName('Tarjetas del inicio')
+      .setDesc('Una por línea: título | imagen (nombre en Portadas o Banners, o URL) | notas separadas por coma. Vacío = las de siempre.')
+      .addTextArea((t) => {
+        t.setPlaceholder('Estudio | mi-portada.jpg | Panel académico, Conocimiento, Repaso').setValue(s.hubCards || '').onChange(async (v) => ((s.hubCards = v), await save()));
+        t.inputEl.rows = 4;
+        t.inputEl.style.width = '100%';
+      });
+
     containerEl.createEl('h3', { text: 'Conexiones y repaso' });
     new Setting(containerEl).setName('Modelo de embeddings').setDesc('Para notas relacionadas y preguntas al vault. Recomendado: bge-m3 (multilingüe, ~1,2 GB). Más liviano: nomic-embed-text (entiende peor el español).').addText((t) => t.setValue(s.embedModel).onChange(async (v) => ((s.embedModel = v.trim() || 'bge-m3'), await save())));
     new Setting(containerEl).setName('Indexar en segundo plano al abrir Obsidian').addToggle((t) => t.setValue(s.autoIndex !== false).onChange(async (v) => ((s.autoIndex = v), await save())));
+    new Setting(containerEl).setName('Enlaces nuevos en páginas crean subpáginas').setDesc('Al hacer clic en un [[enlace]] que aún no existe dentro de una página de estudio, la nota nueva nace como subpágina suya (con cabecera, padre y propiedades heredadas).').addToggle((t) => t.setValue(s.autoSubpages !== false).onChange(async (v) => ((s.autoSubpages = v), await save())));
     new Setting(containerEl).setName('Tarjetas nuevas por día').addText((t) => t.setValue(String(s.newCardsPerDay || 15)).onChange(async (v) => ((s.newCardsPerDay = clamp(parseInt(v, 10) || 15, 1, 200)), await save())));
 
     containerEl.createEl('h3', { text: 'Biblioteca' });
@@ -4689,6 +6182,21 @@ class RaizSettingTab extends PluginSettingTab {
       .setDesc('Separados por coma.')
       .addText((t) => t.setValue(s.mediaStates.join(', ')).onChange(async (v) => ((s.mediaStates = v.split(',').map((x) => x.trim()).filter(Boolean)), await save())));
 
+    containerEl.createEl('h3', { text: 'Mis metas' });
+    new Setting(containerEl)
+      .setName('Metas diarias')
+      .setDesc(`${this.plugin.activeGoals().length} activas: agua, comida, pasos, lectura… con tus propios números y unidades.`)
+      .addButton((b) => b.setButtonText('Editar mis metas').setCta().onClick(() => this.plugin.editGoals(() => this.display())));
+    containerEl.createEl('h3', { text: 'Fondos por apartado' });
+    containerEl.createDiv({ cls: 'setting-item-description', text: 'Para cambiar uno, abre una nota de ese apartado y usa el botón Fondo o el comando "Cambiar imagen de fondo".' });
+    for (const sec of this.plugin.sections()) {
+      const v = this.plugin.sectionBanner(sec.key);
+      if (v === null) continue;
+      new Setting(containerEl)
+        .setName(sec.label)
+        .setDesc(v ? String(v).replace(/^\[\[|\]\]$/g, '') : 'Sin imagen')
+        .addButton((b) => b.setButtonText('Restaurar el original').onClick(async () => (await this.plugin.applySectionBanner(sec, null), this.display())));
+    }
     containerEl.createEl('h3', { text: 'Hábitos y Rueda de la Vida' });
     new Setting(containerEl)
       .setName('Hábitos')

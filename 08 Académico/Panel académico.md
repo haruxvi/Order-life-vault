@@ -10,11 +10,12 @@ banner-radius: 25
 tipo: panel
 semestre: 
 ---
-# 🎓 Panel académico
+# Panel académico
 **Semestre** `INPUT[text(placeholder(vacío = el más reciente)):semestre]` · `BUTTON[raiz-asignatura]`
 ```meta-bind-button
 id: raiz-asignatura
-label: ➕ Nueva asignatura
+label: "Nueva asignatura"
+icon: plus
 style: primary
 class: raiz-btn
 hidden: true
@@ -27,7 +28,7 @@ actions:
 if (window.raiz) await window.raiz.charts.academicDashboard(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 📌 Pendientes de los ramos
+## Pendientes de los ramos
 ```dataview
 TASK
 FROM "08 Académico"
@@ -35,7 +36,7 @@ WHERE !completed AND !pond AND text != ""
 GROUP BY file.link
 ```
 
-## 🗂️ Historial
+## Historial
 ```dataview
 TABLE WITHOUT ID file.link AS Asignatura, semestre AS Semestre, estado AS Estado, creditos AS Créditos
 FROM "08 Académico"

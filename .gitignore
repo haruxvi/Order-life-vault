@@ -15,3 +15,7 @@
 
 # Portadas descargadas de servicios externos (pertenecen a sus titulares)
 11 Biblioteca/_portadas/
+
+# Tus portadas (imágenes de terceros): se quedan en tu PC
+06 Templates/Portadas/*
+!06 Templates/Portadas/.gitkeep

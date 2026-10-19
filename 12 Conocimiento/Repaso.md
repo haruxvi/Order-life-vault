@@ -9,7 +9,7 @@ banner-fade: -75
 banner-radius: 25
 tipo: panel
 ---
-# 🃏 Repaso
+# Repaso
 Tarjetas de tus apuntes con repetición espaciada: lo que te sabes vuelve cada vez más tarde, lo que te cuesta vuelve pronto. Atajos: **espacio** muestra la respuesta, **1–4** califica.
 
 ```dataviewjs

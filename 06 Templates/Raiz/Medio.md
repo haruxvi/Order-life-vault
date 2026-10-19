@@ -30,11 +30,11 @@ if (window.raiz) await window.raiz.charts.mediaHero(dv, this.container); else dv
 
 [[Biblioteca|]]
 
-## ✍️ Reseña
+## Reseña
 - 
 
-## 💬 Momentos y citas
+## Momentos y citas
 - 
 
-## 🔗 Relacionado
+## Relacionado
 - 

@@ -5,7 +5,7 @@ entreno: Calistenia
 tags:
   - rutina
 ---
-# 🏋️ Calistenia
+# Calistenia
 %% Valores de ejemplo: ajústalos a tu nivel. Formato: "- Ejercicio: SERIESxREPS @ PESOkg" %%
 [[Panel de entrenamiento|]]
 

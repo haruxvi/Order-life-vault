@@ -9,7 +9,7 @@ banner-fade: -75
 banner-radius: 25
 tipo: panel
 ---
-# 📥 Bandeja de entrada
+# Bandeja de entrada
 Captura rápido (desde el celular o el PC) y procésalo después con calma: cada cosa se **conecta** a un mapa, se **hace**, se **agenda** o se **suelta**. Así no acumulas notas que nunca vuelves a leer.
 
 ```dataviewjs

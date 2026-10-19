@@ -8,13 +8,14 @@ banner-height: 300
 banner-fade: -75
 banner-radius: 25
 ---
-# 🧠 Conocimiento
+# Conocimiento
 Una idea por nota, conectada a un **mapa** (MOC) o a una asignatura. Los enlaces valen más que las carpetas: si una nota no se conecta con nada, no la vas a volver a encontrar.
 
 `BUTTON[raiz-ask, raiz-conn, raiz-index]` · [[Repaso|🃏 Repaso]] · [[Etiquetas|🏷️ Etiquetas]] · [[Bandeja|📥 Bandeja]]
 ```meta-bind-button
 id: raiz-ask
-label: "🔎 Preguntar al vault"
+label: "Preguntar al vault"
+icon: search
 style: primary
 class: raiz-btn
 hidden: true
@@ -24,7 +25,8 @@ actions:
 ```
 ```meta-bind-button
 id: raiz-conn
-label: "🔗 Panel de conexiones"
+label: "Panel de conexiones"
+icon: link
 style: default
 class: raiz-btn
 hidden: true
@@ -34,7 +36,8 @@ actions:
 ```
 ```meta-bind-button
 id: raiz-index
-label: "✨ Indexar para la IA"
+label: "Indexar para la IA"
+icon: sparkles
 style: default
 class: raiz-btn
 hidden: true

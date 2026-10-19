@@ -5,7 +5,7 @@ entreno: Tirón
 tags:
   - rutina
 ---
-# 🏋️ Tirón
+# Tirón
 %% Valores de ejemplo: ajústalos a tu nivel. Formato: "- Ejercicio: SERIESxREPS @ PESOkg" %%
 [[Panel de entrenamiento|]]
 

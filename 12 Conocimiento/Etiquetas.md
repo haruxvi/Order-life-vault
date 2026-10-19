@@ -9,7 +9,7 @@ banner-fade: -75
 banner-radius: 25
 tipo: panel
 ---
-# 🏷️ Etiquetas
+# Etiquetas
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.tags(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```

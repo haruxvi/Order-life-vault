@@ -2,7 +2,7 @@
 cssclasses:
   - raiz-panel
 ---
-# 📖 Guía de Raíz
+# Guía de Raíz
 
 Raíz es el motor propio de este vault: **IA 100 % local e ilimitada** (con Ollama, sin API key ni licencia), entrenamiento, vida académica, agenda, hábitos y gráficos. Todo vive en tus archivos.
 
@@ -31,7 +31,18 @@ Abre la nota del día (ícono ☀️ en la barra izquierda o **Raíz: Abrir la n
   3. Ajusta kg y reps, y marca **✓** al terminar cada serie: arranca el **descanso** con aviso sonoro y la serie queda registrada. Si superas tu mejor marca aparece **🔥 PR**.
   4. **⏹ Terminar** guarda la duración. Elige tu **RPE**.
   5. Solo cuentan las series marcadas, así que lo planificado y no hecho no ensucia tus estadísticas.
-- **🌡️ Check-in**: ánimo, energía, sueño, peso, horas de estudio y hábitos.
+- **🎯 Mis metas**: agua, comida, pasos, sueño, peso, lectura, estudio… con anillos y barras. Toca **+** o **−**, o toca el número para escribir el valor exacto. Al cumplir una meta hay festejo.
+- **🌡️ Check-in**: ánimo, energía y hábitos de sí o no.
+
+### Tus metas, tus números
+No hay fórmulas tipo "si pesas tanto, come tanto": cada quien pone lo suyo. Con el engranaje del bloque **Mis metas** (o **Raíz: Editar mis metas**) puedes:
+- Cambiar el objetivo, la unidad y cuánto suma cada toque (por ejemplo 0,25 L de agua o 500 pasos).
+- Agregar las metas que quieras (meditar, guitarra, idiomas…), apagarlas, reordenarlas o borrarlas.
+- Elegir el tipo: **Meta** suma hacia un objetivo; **Medida** solo registra un valor, como el peso, con un objetivo opcional.
+- Elegir el estilo: **Anillo**, o **Barra** para ver varias juntas, como los macros bajo las calorías.
+- Agruparlas (Comida, Actividad, Cuerpo, Mente…) y darles ícono y color.
+
+Los números de ejemplo están solo para empezar: ajústalos a ti.
 
 ### Formato de ejercicios (si prefieres escribir a mano)
 ```
@@ -51,12 +62,64 @@ Abre la nota del día (ícono ☀️ en la barra izquierda o **Raíz: Abrir la n
 - El año trae una **🔭 Revisión del año** escrita por la IA, incluyendo tus marcas personales.
 
 ## 4. Paneles
-- [[Inicio]]: tu día, la semana en números y el mes.
+- [[Inicio]]: tu centro.
+  - Reloj y tarjetas por área. Sus imágenes se cambian en **Ajustes → Raíz → Inicio**.
+  - Frase del día, que sale de [[Frases]].
+  - Cuadros de Metas, Rituales y Reflexión, que se editan en [[Mi espacio]].
+  - Mapa de actividad del año: toca un día para ver sus notas.
+  - Tu día y el mes.
+  - **Preparar mi espacio** deja a la derecha el calendario, el grafo local y las conexiones.
 - [[Panel académico]]: horario semanal, promedio por ramo, **nota que necesitas** en lo que queda y próximas evaluaciones (escala chilena 1–7, configurable).
-- [[Panel de entrenamiento]]: sesiones por semana contra tu meta, racha, volumen, peso y sueño, progresión de un ejercicio, mejores marcas y **🧠 Coach** con IA.
+- [[Panel de entrenamiento]]: sesiones por semana contra tu meta, racha, **tus metas de los últimos 7 días** (días cumplidos, promedio y racha), evolución de cualquier meta en 30 días contra su objetivo, volumen, peso y sueño, progresión de un ejercicio, mejores marcas y **🧠 Coach** con IA.
+- Las notas de la semana y del mes también resumen tus metas.
 - [[Agenda]]: los próximos 60 días, calendario y tareas con fecha.
 
-## 📚 Biblioteca: juegos, libros, anime, manga, películas, series
+## Estudio estilo Notion
+Todo vive en `08 Académico/Estudio`.
+
+**Las páginas**
+- Organiza tus páginas en **Áreas** (por ejemplo Informática o Estudios complementarios). Dentro van **Asignaturas** y **Habilidades**, después **Temas** y al final **Apuntes** o **Conceptos**. Crea una con **Raíz: Estudio: nueva página** o con **Nueva subpágina** dentro de otra.
+- Cada página tiene:
+  - Migas de pan.
+  - Un **ícono** que eliges al hacer clic.
+  - **Portada**: imágenes tuyas de `06 Templates/Portadas`, una URL o una al azar.
+  - **Importancia** de 1 a 5 estrellas.
+  - Una tabla con sus subpáginas, con las vistas *Todas las notas*, *Por número de clase*, *Tarjetas* y *Lista simple*.
+- Esas tablas son **Bases** de Obsidian: puedes editar celdas, ordenar, filtrar, agrupar y crear tus propias vistas, igual que en Notion.
+- Las notas de clase se numeran solas (Clase 1, 2, 3…).
+- Una **Colección** es una página que solo agrupa otras, como [[Notas de clase]] dentro de [[Informática]]. Su tabla trae las vistas *Todas las notas*, *Por número de curso*, *Tarjetas* y *Lista simple*, y un botón **Nueva entrada**.
+- Las entradas nuevas **heredan las propiedades de sus hermanas**. Por ejemplo, si una asignatura tiene la casilla `revisado`, la siguiente que crees también la trae, sin marcar.
+
+**Crear dentro de cualquier nota** (botón **Insertar** de la página, clic derecho en el editor, o `/` y escribe *Insertar*)
+- **Nueva página dentro de esta.** Crea la subpágina y deja su `[[enlace]]` donde está el cursor.
+- **Base con vistas.** Una tabla con las subpáginas de la nota y su botón **Nueva entrada**. Sirve en cualquier nota, no solo en las de estudio.
+- **Tarjeta de otra página.** Un enlace visual con portada, ícono, ubicación y resumen, como las tarjetas de Notion.
+- **Módulo.** Cualquier panel del sistema dentro de la nota: Hoy, calendario del mes, agenda, tareas pendientes, biblioteca (completa o de una categoría), panel académico, entrenamiento, repaso, bandeja, conocimiento, notas del tema, mapa de contenido, etiquetas o mapa de actividad.
+- **Convertir esta nota en página.** Le da ícono, portada, importancia y subpáginas a una nota que ya tenías, sin tocar lo que escribiste.
+- Si escribes un `[[enlace]]` a una nota que no existe y le haces clic dentro de una página, la nota nace como **subpágina** suya, guardada a su lado. Puedes apagarlo en los ajustes de Raíz.
+
+**Escribir a mano**
+- Escribe `/` para abrir el menú de bloques, como en Notion. Están los **Bloque: …**:
+  - Nota, Importante, Definición, Ejemplo, Ojo.
+  - Desplegable.
+  - Código, ecuación LaTeX, tabla, comparación A vs B y diagrama.
+  - Pregunta de repaso.
+
+**Escribir con IA** (botón **IA** de la página, o clic derecho sobre texto seleccionado)
+- **Redactar el apunte a partir del título.** Llega con un aviso para revisarlo: el modelo local puede equivocarse, sobre todo en código.
+- **Explicar o mejorar** la selección.
+- **Ejemplo de código.**
+- **Resumir** en la propiedad `resumen`.
+- **Sugerir etiquetas** de tema.
+- **Generar preguntas** de repaso.
+
+**Del método del video**
+- Cada mapa tiene **Todas las notas del tema**, ordenables por importancia o fecha.
+- **Grafo local** abre al lado las conexiones de la nota.
+
+## Biblioteca: juegos, libros, anime, manga, películas, series, videos y cursos
+- **Videos y Cursos de YouTube:** pega el enlace al agregar. Se traen el título, el canal y la miniatura.
+- **Ver tablero:** la biblioteca se ordena en columnas por estado (Pendiente, En curso, Terminado…), con fechas y nota.
 En [[Biblioteca]] o con el ícono de librería en la barra izquierda:
 - **＋ Agregar**: busca el título y elige el resultado. La portada, el autor o estudio, el año, los géneros y el total de episodios o páginas se completan solos. La portada se guarda en el vault, así que funciona sin internet y en el celular.
 - **De dónde salen los datos**:
@@ -70,13 +133,13 @@ En [[Biblioteca]] o con el ícono de librería en la barra izquierda:
 - **Categorías propias** (por ejemplo, juegos de mesa o podcasts): agrégalas en **Ajustes → Raíz → Biblioteca**, con su emoji, color, buscador y unidad.
 - **Vista planilla** para editar en masa: abre `Biblioteca.base`.
 
-## 🧠 Conocimiento: notas conectadas
+## Conocimiento: notas conectadas
 Basado en la idea de *enlazar en vez de archivar*:
 - **Raíz: Nueva nota de conocimiento**: una idea por nota, conectada a un **mapa** (MOC) o a una **asignatura**.
 - Cada asignatura funciona como mapa: sus apuntes aparecen solos en **🧠 Apuntes conectados**.
 - [[Conocimiento]] muestra tus mapas, las notas **huérfanas** (sin enlaces), las más conectadas y tus temas. Desde ahí también abres el grafo.
 
-### 🔗 Panel de conexiones
+### Panel de conexiones
 Ábrelo con el ícono de nodos de la barra izquierda o con **Raíz: Abrir panel de conexiones**. Se actualiza con la nota que tengas abierta y tiene tres partes:
 - **Menciona sin enlazar**: nombres de otras notas que escribiste sin `[[ ]]`. Se enlazan con un clic o todas juntas.
 - **Te nombran sin enlace**: otras notas que nombran a esta. Puedes enlazarlas desde aquí.
@@ -84,10 +147,10 @@ Basado en la idea de *enlazar en vez de archivar*:
   - Usa el modelo `bge-m3`, que entiende bien el español y corre en tu PC.
   - El índice se actualiza solo al abrir Obsidian. A mano: **Raíz: Indexar notas para la IA**.
 
-### 🔎 Pregúntale a tu vault
+### Pregúntale a tu vault
 **Raíz: Pregúntale a todo tu vault**: haz una pregunta. La IA busca las notas más relevantes, responde citándolas con [n] y puedes abrir cada fuente.
 
-### 📥 Bandeja de entrada
+### Bandeja de entrada
 - **Capturar**: **📥 Capturar** (en Inicio o en la barra izquierda) guarda una idea en segundos, sin pensar dónde va.
 - **Procesar**: en [[Bandeja]], cada captura se convierte en:
   - **🧠 Nota**, conectada a un mapa o asignatura.
@@ -98,7 +161,7 @@ Basado en la idea de *enlazar en vez de archivar*:
 - **✨ IA** te sugiere el destino y el mapa, y lo aplicas con un clic.
 - La semana trae un recordatorio para vaciar la bandeja.
 
-### 🏷️ Etiquetas
+### Etiquetas
 - **Convención**:
   - `#tema/…` para el contenido (`#tema/sql`).
   - `#estado/…` para el avance.
@@ -107,7 +170,7 @@ Basado en la idea de *enlazar en vez de archivar*:
 - También ordena las sueltas bajo `tema/` y te avisa cuando un tema tiene 5 notas o más, para crearle un **mapa**.
 - Cada mapa tiene **Etiquetas que reúne**: las notas con esas etiquetas que aún no están conectadas aparecen en el mapa con **＋ Conectar**.
 
-### 🃏 Repaso de apuntes
+### Repaso de apuntes
 - **Crear preguntas**: en un apunte, **🃏 Generar preguntas** crea preguntas tipo certamen con su respuesta. También puedes escribirlas a mano: `- ❓ ¿Pregunta? ➜ Respuesta`.
 - **Repasar**: en [[Repaso]] se usa repetición espaciada. Lo que te sabes vuelve cada vez más tarde y lo que te cuesta vuelve pronto.
   - Atajos: **espacio** muestra la respuesta y **1–4** califica.
@@ -122,11 +185,11 @@ Basado en la idea de *enlazar en vez de archivar*:
 
 ## 6. Personalizar
 En **Ajustes → Raíz** puedes cambiar:
-- Hábitos (`clave | etiqueta`).
+- **Mis metas** (botón **Editar mis metas**).
+- Hábitos de sí o no (`clave | etiqueta`).
 - Áreas de la Rueda de la Vida (`clave | emoji | etiqueta | color | descripción`).
 - Tipos de entrenamiento y meta de sesiones por semana.
 - Escala de notas y semestre actual.
-- El texto **Sobre ti**, que la IA usa como contexto.
 
 Los cambios aplican a las notas nuevas.
 
@@ -134,6 +197,13 @@ Los cambios aplican a las notas nuevas.
 El tema está en `.obsidian/snippets/raiz-theme.css` y usa la paleta "bosque nocturno":
 - **Un color por día de la semana**: lunes celeste, martes menta, miércoles lima, jueves ámbar, viernes coral, sábado violeta y domingo turquesa.
 - **Un color por periodo**: semana violeta, mes ámbar, trimestre celeste y año rosa.
+
+### Imagen de fondo de cada apartado
+En cualquier nota usa el botón **Fondo** de la cabecera, la opción **Cambiar imagen de fondo** del menú de la nota (⋯ o clic derecho en la pestaña) o el comando **Raíz: Cambiar imagen de fondo**. Puedes:
+- **Elegir una imagen de tu PC.** Se copia a `06 Templates/Portadas`, que no se sube a GitHub.
+- Pegar una URL, o usar uno de los fondos de Raíz o una imagen al azar.
+- Aplicarla **solo a esa nota** o a **todo el apartado**: días, semanas, meses, trimestres, años, Académico, Entrenamiento, Agenda, Biblioteca, Conocimiento, Inicio o Bandeja. Con todo el apartado cambian las notas que ya tienes ahí y las que crees después. Tus portadas propias se respetan.
+- **Restaurar el original** cuando quieras. En **Ajustes → Raíz → Fondos por apartado** ves los que cambiaste.
 
 Los banners se generan con código (aurora, curvas de nivel y raíces) y están en `06 Templates/Banners`. Para cambiar un color, edita las variables `--raiz-a1` y `--raiz-a2` del snippet.
 

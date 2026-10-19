@@ -9,11 +9,12 @@ banner-fade: -75
 banner-radius: 25
 tipo: panel
 ---
-# 📅 Agenda
+# Agenda
 `BUTTON[raiz-evento]`
 ```meta-bind-button
 id: raiz-evento
-label: ➕ Nuevo evento o reunión
+label: "Nuevo evento o reunión"
+icon: plus
 style: primary
 class: raiz-btn
 hidden: true
@@ -32,14 +33,14 @@ if (window.raiz) await window.raiz.charts.agenda(dv, this.container); else dv.pa
 if (window.raiz) await window.raiz.charts.monthCalendar(dv, this.container, { month: moment().format("YYYY-MM") }); else dv.paragraph("Cargando Raíz…");
 ```
 
-## ⏰ Tareas con fecha
+## Tareas con fecha
 ```dataview
 TASK
 WHERE !completed AND vence
 SORT vence ASC
 ```
 
-## 🗂️ Eventos pasados
+## Eventos pasados
 ```dataview
 TABLE WITHOUT ID file.link AS Evento, fecha AS Fecha, categoria AS Tipo
 FROM "10 Agenda"

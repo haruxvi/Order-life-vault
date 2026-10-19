@@ -12,10 +12,148 @@
   "notaMin": 1,
   "notaMax": 7,
   "metaSesionesSemana": 4,
+  "goals": [
+    {
+      "key": "kcal",
+      "label": "Calorías",
+      "icon": "utensils",
+      "unit": "kcal",
+      "goal": 2000,
+      "step": 100,
+      "color": "#22c55e",
+      "group": "Comida",
+      "tipo": "meta",
+      "estilo": "anillo"
+    },
+    {
+      "key": "proteina",
+      "label": "Proteína",
+      "icon": "beef",
+      "unit": "g",
+      "goal": 120,
+      "step": 10,
+      "color": "#f472b6",
+      "group": "Comida",
+      "tipo": "meta",
+      "estilo": "barra"
+    },
+    {
+      "key": "carbos",
+      "label": "Carbohidratos",
+      "icon": "wheat",
+      "unit": "g",
+      "goal": 250,
+      "step": 10,
+      "color": "#fbbf24",
+      "group": "Comida",
+      "tipo": "meta",
+      "estilo": "barra"
+    },
+    {
+      "key": "grasas",
+      "label": "Grasas",
+      "icon": "droplets",
+      "unit": "g",
+      "goal": 70,
+      "step": 5,
+      "color": "#a78bfa",
+      "group": "Comida",
+      "tipo": "meta",
+      "estilo": "barra"
+    },
+    {
+      "key": "agua",
+      "label": "Agua",
+      "icon": "droplet",
+      "unit": "L",
+      "goal": 2.5,
+      "step": 0.25,
+      "color": "#38bdf8",
+      "group": "Comida",
+      "tipo": "meta",
+      "estilo": "anillo"
+    },
+    {
+      "key": "ejercicio",
+      "label": "Ejercicio",
+      "icon": "flame",
+      "unit": "min",
+      "goal": 45,
+      "step": 5,
+      "color": "#f97316",
+      "group": "Actividad",
+      "tipo": "meta",
+      "estilo": "anillo"
+    },
+    {
+      "key": "pasos",
+      "label": "Pasos",
+      "icon": "footprints",
+      "unit": "pasos",
+      "goal": 7000,
+      "step": 500,
+      "color": "#14b8a6",
+      "group": "Actividad",
+      "tipo": "meta",
+      "estilo": "anillo"
+    },
+    {
+      "key": "sueno",
+      "label": "Sueño",
+      "icon": "moon",
+      "unit": "h",
+      "goal": 8,
+      "step": 0.5,
+      "color": "#6366f1",
+      "group": "Cuerpo",
+      "tipo": "meta",
+      "estilo": "anillo"
+    },
+    {
+      "key": "peso",
+      "label": "Peso",
+      "icon": "scale",
+      "unit": "kg",
+      "goal": null,
+      "step": 0.1,
+      "color": "#ab47bc",
+      "group": "Cuerpo",
+      "tipo": "medida",
+      "estilo": "anillo"
+    },
+    {
+      "key": "lectura",
+      "label": "Lectura",
+      "icon": "book-open",
+      "unit": "min",
+      "goal": 20,
+      "step": 5,
+      "color": "#eab308",
+      "group": "Mente",
+      "tipo": "meta",
+      "estilo": "anillo"
+    },
+    {
+      "key": "horasEstudio",
+      "label": "Estudio",
+      "icon": "graduation-cap",
+      "unit": "h",
+      "goal": 2,
+      "step": 0.5,
+      "color": "#8b5cf6",
+      "group": "Mente",
+      "tipo": "meta",
+      "estilo": "anillo"
+    }
+  ],
+  "goalsReviewed": false,
+  "sectionBanners": {},
   "restSeconds": 90,
   "embedModel": "bge-m3",
+  "hubCards": "",
   "newCardsPerDay": 15,
   "autoIndex": true,
+  "autoSubpages": true,
   "mediaStates": [
     "Pendiente",
     "En curso",
@@ -71,6 +209,22 @@
       "color": "#f472b6",
       "provider": "tvmaze",
       "unidad": "episodios"
+    },
+    {
+      "key": "video",
+      "label": "Videos",
+      "emoji": "▶️",
+      "color": "#ef4444",
+      "provider": "youtube",
+      "unidad": "min"
+    },
+    {
+      "key": "curso",
+      "label": "Cursos",
+      "emoji": "🧭",
+      "color": "#22d3ee",
+      "provider": "youtube",
+      "unidad": "lecciones"
     }
   ],
   "trainingTypes": [
@@ -153,18 +307,6 @@
   ],
   "habits": [
     {
-      "key": "agua",
-      "label": "💧 2 L de agua"
-    },
-    {
-      "key": "proteina",
-      "label": "🥩 Meta de proteína"
-    },
-    {
-      "key": "lectura",
-      "label": "📖 Leer 20 min"
-    },
-    {
       "key": "aprender",
       "label": "🧠 Aprender algo nuevo"
     },
@@ -189,6 +331,8 @@
     "agenda": "10 Agenda",
     "library": "11 Biblioteca",
     "banners": "06 Templates/Banners",
+    "dashboard": "00 Dashboard",
+    "covers": "06 Templates/Portadas",
     "knowledge": "12 Conocimiento",
     "inbox": "00 Bandeja"
   }

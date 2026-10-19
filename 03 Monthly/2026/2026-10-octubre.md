@@ -10,8 +10,8 @@ cssclasses:
   - monthly
 tipo: mensual
 date: 2026-10-01
-alias:
-pregunta:
+alias: 
+pregunta: 
 respuesta: ""
 resumen: ""
 tipoGrafico: line
@@ -57,14 +57,15 @@ actions:
 INPUT[text(placeholder('Ponle nombre a tu mes'), class('raiz-input-big')):alias]
 ```
 
-## 📝 Resumen
+## Resumen
 ```meta-bind
 INPUT[editor(class(raiz-editor)):resumen]
 ```
 `BUTTON[raiz-ia-resumen, raiz-ia-titulo]`
 ```meta-bind-button
 id: raiz-ia-resumen
-label: "✨ Resumir"
+label: "Resumir"
+icon: sparkles
 style: primary
 class: raiz-btn
 hidden: true
@@ -74,7 +75,8 @@ actions:
 ```
 ```meta-bind-button
 id: raiz-ia-titulo
-label: "🏷️ Título"
+label: "Título"
+icon: tag
 style: primary
 class: raiz-btn
 hidden: true
@@ -83,42 +85,42 @@ actions:
     command: raiz:ai-title
 ```
 
-## 📅 Calendario
+## Calendario
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.monthCalendar(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 📊 Valoraciones
+## Valoraciones
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.ratingChart(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 🗒️ Registro
+## Registro
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.periodLogs(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 📷 Fotos
+## Fotos
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.gallery(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 🗓️ Semanas
+## Semanas
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.periodTable(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 🏋️ Entrenamiento
+## Entrenamiento
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.periodTraining(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## ✅ Hábitos
+## Hábitos
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.periodHabits(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 🌟 Rueda de la Vida
+## Rueda de la Vida
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.wheelChart(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
@@ -127,12 +129,13 @@ if (window.raiz) await window.raiz.charts.wheelChart(dv, this.container); else d
 if (window.raiz) await window.raiz.charts.wheelProgression(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-### 🔎 Pregúntale a tu mes
+### Pregúntale a tu mes
 `INPUT[text(placeholder('Escribe una pregunta…'), class('raiz-input-big')):pregunta]`
 `BUTTON[raiz-preguntar]`
 ```meta-bind-button
 id: raiz-preguntar
-label: "🔎 Preguntar"
+label: "Preguntar"
+icon: search
 style: primary
 class: raiz-btn
 hidden: true
@@ -143,4 +146,3 @@ actions:
 ```meta-bind
 INPUT[editor(class(raiz-editor)):respuesta]
 ```
-

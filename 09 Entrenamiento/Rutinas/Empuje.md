@@ -5,7 +5,7 @@ entreno: Empuje
 tags:
   - rutina
 ---
-# 🏋️ Empuje
+# Empuje
 %% Valores de ejemplo: ajústalos a tu nivel. Formato: "- Ejercicio: SERIESxREPS @ PESOkg" %%
 [[Panel de entrenamiento|]]
 

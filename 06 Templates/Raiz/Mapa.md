@@ -7,7 +7,7 @@ temas:
 tags:
   - mapa
 ---
-# 🗺️ {{titulo}}
+# {{titulo}}
 {{descripcion}}
 
 **Etiquetas que reúne:** `INPUT[list:temas]`
@@ -18,6 +18,11 @@ if (window.raiz) await window.raiz.charts.moc(dv, this.container); else dv.parag
 
 [[Conocimiento|]]
 
-## 🧭 Ruta sugerida
+## Todas las notas del tema
+```dataviewjs
+if (window.raiz) await window.raiz.charts.topicTable(dv, this.container); else dv.paragraph("Cargando…");
+```
+
+## Ruta sugerida
 %% Ordena aquí las notas clave en el orden en que conviene leerlas. %%
 1. 

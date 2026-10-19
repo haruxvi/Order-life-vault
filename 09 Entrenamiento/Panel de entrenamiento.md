@@ -13,18 +13,19 @@ ejercicio: Press banca
 coach: ""
 coachFecha: 
 ---
-# 🏋️ Panel de entrenamiento
+# Panel de entrenamiento
 **Ver últimas** `INPUT[number:semanas]` semanas · **Progresión de** `INPUT[text(placeholder(ejercicio)):ejercicio]`
 
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.trainingDashboard(dv, this.container); else dv.paragraph("Cargando Raíz…");
 ```
 
-## 🧠 Coach
+## Coach
 `BUTTON[raiz-coach, raiz-rutina]`
 ```meta-bind-button
 id: raiz-coach
-label: 🧠 Analizar mis últimas 4 semanas
+label: "Analizar mis últimas 4 semanas"
+icon: brain
 style: primary
 class: raiz-btn
 hidden: true
@@ -34,7 +35,8 @@ actions:
 ```
 ```meta-bind-button
 id: raiz-rutina
-label: ➕ Nueva rutina
+label: "Nueva rutina"
+icon: plus
 style: default
 class: raiz-btn
 hidden: true
@@ -47,14 +49,14 @@ actions:
 INPUT[editor(class(raiz-editor)):coach]
 ```
 
-## 📋 Mis rutinas
+## Mis rutinas
 ```dataview
 TABLE WITHOUT ID file.link AS Rutina, entreno AS Tipo
 FROM "09 Entrenamiento/Rutinas"
 SORT file.name ASC
 ```
 
-## 📝 Cómo registrar
+## Cómo registrar
 En tu nota diaria, sección **🏋️ Entrenamiento**:
 1. Elige el tipo y aprieta **▶ Empezar** (cronómetro).
 2. **📋 Rutina** carga los ejercicios con tu **última marca** de cada uno, o agrega ejercicios con el buscador (autocompleta con tu historial).
