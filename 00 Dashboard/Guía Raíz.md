@@ -10,7 +10,7 @@ Raíz es el motor propio de este vault: **IA a tu elección** (local e ilimitada
 Haz clic en **✦ IA**, abajo a la derecha, o ve a **Ajustes → Raíz → Buscar mis IAs**. Raíz revisa lo que tienes y lo muestra en tres grupos:
 - **En tu equipo**: Ollama, LM Studio, OpenClaw, Jan, llama.cpp o vLLM. Es gratis, sin límites y privado.
 - **Tus suscripciones**: Claude Pro/Max, ChatGPT Plus/Pro, Google Gemini, Kimi y OpenCode. Funcionan con el programa oficial de cada empresa (Claude Code, Codex CLI, Gemini CLI, Kimi Code CLI, OpenCode). Lo instalas e inicias sesión **una vez** en una terminal con tu cuenta, sin API key. Cada respuesta cuenta en el límite de uso de tu plan.
-- **Tus API keys**: OpenAI, Anthropic, xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq y OpenCode Zen. Encuentra las que guardaste en el Llavero de Obsidian o en tus variables de entorno.
+- **Tus API keys**: OpenRouter y Vercel AI Gateway (una sola key para cientos de modelos), OpenAI, Anthropic, xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, Mistral, Groq, Together, Fireworks, Perplexity, Cerebras, SambaNova, Hugging Face, NVIDIA NIM, Z.ai (GLM), MiniMax, Cohere, Azure OpenAI y OpenCode Zen. Encuentra las que guardaste en el Llavero de Obsidian o en tus variables de entorno.
 
 En cada opción aparecen el **modelo rápido** y el **profundo** que Raíz elige solo. Con Ollama los elige según la RAM de cada equipo: en el PC de 8 GB usa uno chico y en el de 16 GB uno más grande. Los puedes cambiar ahí mismo. Con **Usar esta** queda todo configurado, y **Probar** comprueba que responde.
 

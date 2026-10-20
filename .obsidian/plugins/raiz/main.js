@@ -22,6 +22,19 @@ const AI_PROVIDERS = {
   gemini: { label: 'Google Gemini', kind: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', needsKey: true, json: true, fast: 'gemini-2.5-flash', deep: 'gemini-2.5-pro', keyUrl: 'https://aistudio.google.com/apikey' },
   openrouter: { label: 'OpenRouter (cientos de modelos con una sola key)', kind: 'openai', baseUrl: 'https://openrouter.ai/api/v1', needsKey: true, keyUrl: 'https://openrouter.ai/keys', hint: 'Con una sola key usas modelos de OpenAI, Anthropic, Google, xAI, DeepSeek, Qwen, Kimi y más.' },
   groq: { label: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, json: true, fast: 'llama-3.3-70b-versatile', deep: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
+  mistral: { label: 'Mistral AI', kind: 'openai', baseUrl: 'https://api.mistral.ai/v1', needsKey: true, json: true, fast: 'mistral-small-latest', deep: 'mistral-large-latest', embed: 'mistral-embed', keyUrl: 'https://console.mistral.ai/api-keys' },
+  together: { label: 'Together AI', kind: 'openai', baseUrl: 'https://api.together.xyz/v1', needsKey: true, json: true, keyUrl: 'https://api.together.ai/settings/api-keys', hint: 'Modelos abiertos (Llama, Qwen, DeepSeek, Kimi, GLM…). Usa "Cargar modelos".' },
+  fireworks: { label: 'Fireworks AI', kind: 'openai', baseUrl: 'https://api.fireworks.ai/inference/v1', needsKey: true, json: true, keyUrl: 'https://fireworks.ai/account/api-keys' },
+  perplexity: { label: 'Perplexity (responde buscando en internet)', kind: 'openai', baseUrl: 'https://api.perplexity.ai', needsKey: true, noModels: true, fast: 'sonar', deep: 'sonar-pro', keyUrl: 'https://www.perplexity.ai/settings/api' },
+  cerebras: { label: 'Cerebras (muy rápido)', kind: 'openai', baseUrl: 'https://api.cerebras.ai/v1', needsKey: true, keyUrl: 'https://cloud.cerebras.ai' },
+  sambanova: { label: 'SambaNova', kind: 'openai', baseUrl: 'https://api.sambanova.ai/v1', needsKey: true, keyUrl: 'https://cloud.sambanova.ai/apis' },
+  huggingface: { label: 'Hugging Face (Inference Providers)', kind: 'openai', baseUrl: 'https://router.huggingface.co/v1', needsKey: true, keyUrl: 'https://huggingface.co/settings/tokens', hint: 'Usa un token de Hugging Face con permiso de inferencia.' },
+  nvidia: { label: 'NVIDIA NIM', kind: 'openai', baseUrl: 'https://integrate.api.nvidia.com/v1', needsKey: true, keyUrl: 'https://build.nvidia.com' },
+  zai: { label: 'Z.ai (GLM de Zhipu)', kind: 'openai', baseUrl: 'https://api.z.ai/api/paas/v4', needsKey: true, keyUrl: 'https://z.ai/manage-apikey/apikey-list' },
+  minimax: { label: 'MiniMax', kind: 'openai', baseUrl: 'https://api.minimax.io/v1', needsKey: true, noModels: true, keyUrl: 'https://www.minimax.io/platform', hint: 'Escribe el nombre del modelo que tengas disponible en tu cuenta.' },
+  cohere: { label: 'Cohere', kind: 'openai', baseUrl: 'https://api.cohere.ai/compatibility/v1', needsKey: true, keyUrl: 'https://dashboard.cohere.com/api-keys' },
+  vercel: { label: 'Vercel AI Gateway (muchos proveedores con una key)', kind: 'openai', baseUrl: 'https://ai-gateway.vercel.sh/v1', needsKey: true, keyUrl: 'https://vercel.com/ai-gateway', hint: 'Los modelos van como proveedor/modelo (ej. anthropic/claude-sonnet-5-5).' },
+  azure: { label: 'Azure OpenAI', kind: 'openai', baseUrl: '', needsKey: true, keyHeader: 'api-key', hint: 'URL base: https://<tu-recurso>.openai.azure.com/openai/v1 · Modelo: el nombre de tu despliegue.' },
   opencode: { label: 'OpenCode Zen', kind: 'openai', baseUrl: 'https://opencode.ai/zen/v1', needsKey: true, keyUrl: 'https://opencode.ai/zen', hint: 'Usa tu API key de OpenCode Zen y "Cargar modelos" para elegir el modelo.' },
   openclaw: { label: 'OpenClaw (tu agente personal)', kind: 'openai', local: true, baseUrl: 'http://127.0.0.1:18789/v1', fast: 'openclaw:main', deep: 'openclaw:main', hint: 'Activa en OpenClaw gateway.http.endpoints.chatCompletions.enabled. El modelo es openclaw:<id del agente> (ej. openclaw:main), y en "API key" va el token del gateway si lo usas. Revisa el puerto de tu gateway.' },
   // Suscripciones: se usan a través del programa oficial de cada empresa, con tu sesión iniciada (sin API key)
@@ -1121,20 +1134,32 @@ class AiScanModal extends Modal {
         );
       }
     }
-    // Lo que no está: cómo agregarlo
-    const missing = contentEl.createEl('details', { cls: 'raiz-ai-more' });
-    missing.createEl('summary', { text: 'Agregar otra IA' });
+    // Lo que no está: cómo agregarlo, por tipo (abierto si casi no hay nada)
     const have = new Set(found.map((f) => f.id));
-    const list = missing.createDiv({ cls: 'raiz-ai-add' });
-    for (const [id, pv] of Object.entries(AI_PROVIDERS)) {
-      if (have.has(id) || id === 'custom' || id === 'custom_cli') continue;
-      const row = list.createDiv({ cls: 'raiz-ai-add-row' });
-      const info = row.createDiv();
-      info.createDiv({ cls: 'raiz-ai-name', text: pv.label });
-      info.createDiv({ cls: 'raiz-muted', text: pv.kind === 'cli' ? `Instala el programa e inicia sesión con: ${pv.login || pv.bin}` : pv.local ? 'Ábrelo en tu PC y vuelve a buscar.' : pv.kind === 'ollama' ? 'Instálalo desde ollama.com.' : 'Pega tu API key para usarlo.' });
-      const act = row.createDiv({ cls: 'raiz-ai-add-act' });
-      if (pv.kind === 'openai' || pv.kind === 'anthropic') {
-        if (!pv.local) {
+    const more = contentEl.createEl('details', { cls: 'raiz-ai-more' });
+    if (found.length < 3) more.setAttr('open', '');
+    more.createEl('summary', { text: 'Agregar otra IA' });
+    const order = ['openrouter', 'vercel']; // una sola key para muchos modelos: primero
+    const entries = Object.entries(AI_PROVIDERS)
+      .filter(([id]) => !have.has(id) && id !== 'custom' && id !== 'custom_cli')
+      .sort((x, y) => (order.includes(y[0]) ? 1 : 0) - (order.includes(x[0]) ? 1 : 0));
+    const sections = [
+      ['Con API key (pago por uso)', ([, pv]) => (pv.kind === 'openai' || pv.kind === 'anthropic') && !pv.local],
+      ['Con tu suscripción (programa oficial)', ([, pv]) => pv.kind === 'cli'],
+      ['En tu equipo', ([, pv]) => pv.local || pv.kind === 'ollama'],
+    ];
+    for (const [title, test] of sections) {
+      const items = entries.filter(test);
+      if (!items.length) continue;
+      more.createEl('h5', { cls: 'raiz-ai-add-title', text: title });
+      const list = more.createDiv({ cls: 'raiz-ai-add' });
+      for (const [id, pv] of items) {
+        const row = list.createDiv({ cls: 'raiz-ai-add-row' });
+        const info = row.createDiv();
+        info.createDiv({ cls: 'raiz-ai-name', text: pv.label });
+        info.createDiv({ cls: 'raiz-muted', text: pv.kind === 'cli' ? `Instala el programa e inicia sesión con: ${pv.login || pv.bin}` : pv.local ? 'Ábrelo en tu PC y vuelve a buscar.' : pv.kind === 'ollama' ? 'Instálalo desde ollama.com.' : pv.hint || 'Pega tu API key para usarlo.' });
+        const act = row.createDiv({ cls: 'raiz-ai-add-act' });
+        if ((pv.kind === 'openai' || pv.kind === 'anthropic') && !pv.local) {
           const inp = act.createEl('input', { cls: 'raiz-input', attr: { type: 'password', placeholder: 'API key' } });
           act.createEl('button', { cls: 'mod-cta', text: 'Guardar' }).addEventListener('click', () => {
             if (!inp.value.trim()) return;
@@ -1142,17 +1167,18 @@ class AiScanModal extends Modal {
             new Notice(`Key de ${pv.label} guardada en el Llavero.`);
             this.scan();
           });
+          if (pv.keyUrl) act.createEl('button', { text: 'Conseguir key' }).addEventListener('click', () => window.open(pv.keyUrl));
         }
-        if (pv.keyUrl) act.createEl('button', { text: 'Conseguir key' }).addEventListener('click', () => window.open(pv.keyUrl));
+        const url = pv.install || (pv.kind === 'ollama' ? 'https://ollama.com' : id === 'lmstudio' ? 'https://lmstudio.ai' : id === 'openclaw' ? 'https://openclaw.ai' : null);
+        if (url) act.createEl('button', { text: pv.kind === 'cli' ? 'Instalar' : 'Descargar' }).addEventListener('click', () => window.open(url));
+        if (pv.kind === 'cli' && pv.login)
+          act.createEl('button', { text: 'Copiar comando' }).addEventListener('click', () => {
+            navigator.clipboard.writeText(pv.login.split(' (')[0]);
+            new Notice(`Copiado: ${pv.login}. Pégalo en una terminal para iniciar sesión.`);
+          });
       }
-      const url = pv.install || (pv.kind === 'ollama' ? 'https://ollama.com' : id === 'lmstudio' ? 'https://lmstudio.ai' : null);
-      if (url) act.createEl('button', { text: pv.kind === 'cli' ? 'Instalar' : 'Descargar' }).addEventListener('click', () => window.open(url));
-      if (pv.kind === 'cli' && pv.login)
-        act.createEl('button', { text: 'Copiar comando' }).addEventListener('click', () => {
-          navigator.clipboard.writeText(pv.login.split(' (')[0]);
-          new Notice(`Copiado: ${pv.login}. Pégalo en una terminal para iniciar sesión.`);
-        });
     }
+    more.createDiv({ cls: 'raiz-muted raiz-ai-add-foot', text: '¿No está el tuyo? Cualquier servicio, bot o agente con API compatible con OpenAI, o cualquier programa de terminal, se agrega en "Configuración manual".' });
     const bar = contentEl.createDiv({ cls: 'raiz-ai-bar' });
     bar.createEl('button', { text: 'Buscar de nuevo' }).addEventListener('click', () => this.scan());
     bar.createEl('button', { text: 'Configuración manual' }).addEventListener('click', () => {
@@ -1446,7 +1472,7 @@ module.exports = class RaizPlugin extends Plugin {
   }
   // ───────────── Escáner: qué IAs tienes disponibles (local, suscripciones y API keys) ─────────────
   envKeyFor(id) {
-    const vars = { openai: ['OPENAI_API_KEY'], anthropic: ['ANTHROPIC_API_KEY'], xai: ['XAI_API_KEY', 'GROK_API_KEY'], deepseek: ['DEEPSEEK_API_KEY'], kimi: ['MOONSHOT_API_KEY', 'KIMI_API_KEY'], qwen: ['DASHSCOPE_API_KEY', 'QWEN_API_KEY'], gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'], openrouter: ['OPENROUTER_API_KEY'], groq: ['GROQ_API_KEY'], opencode: ['OPENCODE_API_KEY'] }[id];
+    const vars = { openai: ['OPENAI_API_KEY'], anthropic: ['ANTHROPIC_API_KEY'], xai: ['XAI_API_KEY', 'GROK_API_KEY'], deepseek: ['DEEPSEEK_API_KEY'], kimi: ['MOONSHOT_API_KEY', 'KIMI_API_KEY'], qwen: ['DASHSCOPE_API_KEY', 'QWEN_API_KEY'], gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'], openrouter: ['OPENROUTER_API_KEY'], groq: ['GROQ_API_KEY'], opencode: ['OPENCODE_API_KEY'], mistral: ['MISTRAL_API_KEY'], together: ['TOGETHER_API_KEY'], fireworks: ['FIREWORKS_API_KEY'], perplexity: ['PERPLEXITY_API_KEY', 'PPLX_API_KEY'], cerebras: ['CEREBRAS_API_KEY'], sambanova: ['SAMBANOVA_API_KEY'], huggingface: ['HF_TOKEN', 'HUGGINGFACE_API_KEY'], nvidia: ['NVIDIA_API_KEY'], zai: ['ZAI_API_KEY', 'ZHIPUAI_API_KEY'], minimax: ['MINIMAX_API_KEY'], cohere: ['COHERE_API_KEY', 'CO_API_KEY'], vercel: ['AI_GATEWAY_API_KEY'], azure: ['AZURE_OPENAI_API_KEY'] }[id];
     try {
       for (const v of vars || []) if (process.env[v]) return { key: process.env[v], from: v };
     } catch (e) {
@@ -1605,7 +1631,7 @@ module.exports = class RaizPlugin extends Plugin {
   }
   aiHeaders(c, id, key = this.apiKey(id)) {
     if (c.kind === 'anthropic') return { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
-    const h = key ? { Authorization: `Bearer ${key}` } : {};
+    const h = key ? (c.keyHeader ? { [c.keyHeader]: key } : { Authorization: `Bearer ${key}` }) : {};
     if (id === 'openrouter') Object.assign(h, { 'HTTP-Referer': 'https://obsidian.md', 'X-Title': 'Raiz' });
     return h;
   }
@@ -1667,7 +1693,7 @@ module.exports = class RaizPlugin extends Plugin {
   /** Lista de modelos del proveedor elegido (para elegirlos en los ajustes). */
   async listModels(id = this.aiId(), key) {
     const c = this.aiConf(id);
-    if (c.kind === 'cli') return (c.models || []).slice();
+    if (c.kind === 'cli' || c.noModels) return [c.fast, c.deep].filter((x, i, a) => x && a.indexOf(x) === i);
     if (id === 'ollama') {
       const res = await this.aiRequest(`${this.ollamaUrl()}/api/tags`, { method: 'GET' });
       if (res.status >= 400) throw new Error(this.aiError(res));
@@ -6750,7 +6776,7 @@ class RaizSettingTab extends PluginSettingTab {
     now
       .addButton((b) => b.setButtonText('Buscar mis IAs').setCta().onClick(() => new AiScanModal(p, () => this.display()).open()))
       .addButton((b) => b.setButtonText('Probar').onClick(() => p.run(() => p.testAI())));
-    containerEl.createDiv({ cls: 'setting-item-description', text: 'Raíz revisa qué tienes: IA local (Ollama, LM Studio, OpenClaw…), tus suscripciones (Claude, ChatGPT, Gemini, Kimi, OpenCode) y tus API keys, y elige los modelos y parámetros por ti.' });
+    containerEl.createDiv({ cls: 'setting-item-description', text: 'Raíz revisa qué tienes: IA local (Ollama, LM Studio, OpenClaw…), tus suscripciones (Claude, ChatGPT, Gemini, Kimi, OpenCode) y tus API keys (OpenRouter, OpenAI, Anthropic, Grok, DeepSeek, Mistral y 20 más), y elige los modelos y parámetros por ti.' });
     new Setting(containerEl)
       .setName('Configuración manual')
       .setDesc('Elegir proveedor, URL, modelos y comandos a mano.')

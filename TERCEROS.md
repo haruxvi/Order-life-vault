@@ -34,8 +34,10 @@ Estos plugins se usan en el vault, pero **no se redistribuyen** porque su reposi
 | Paste URL into selection | denolehov | https://github.com/denolehov/obsidian-url-into-selection |
 
 ## Servicios externos
-- La **IA local** usa [Ollama](https://ollama.com) y modelos de terceros (`qwen2.5`, `bge-m3`), que se descargan aparte y se rigen por sus propias licencias.
+- La **IA** funciona con el proveedor que elijas: local (Ollama, LM Studio, OpenClaw y otros), por suscripción (con el programa oficial de cada empresa: Claude Code, Codex CLI, Gemini CLI, Kimi Code CLI, OpenCode) o con tu API key (OpenRouter, OpenAI, Anthropic, xAI, DeepSeek, Mistral y otros). Ninguno viene incluido: cada servicio, programa y modelo (por ejemplo `qwen2.5` o `bge-m3`) se instala o contrata aparte y se rige por sus propios términos y licencias.
 - La **Biblioteca** consulta APIs públicas para obtener portadas y datos: Steam, OpenLibrary, AniList, Jikan/MyAnimeList, TVMaze y Wikipedia. Las portadas descargadas pertenecen a sus titulares y no se incluyen en este repositorio.
+- Los **videos y cursos** usan el servicio público oEmbed de YouTube para obtener el título y la miniatura.
+- La **tipografía** puede descargar fuentes de Google Fonts al elegirlas. Cada fuente conserva su licencia, en su mayoría SIL Open Font License.
 
 ## Lo propio
 Son de mi autoría:

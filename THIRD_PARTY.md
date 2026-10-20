@@ -34,8 +34,10 @@ These plugins are used by the vault but are **not redistributed**, because their
 | Paste URL into selection | denolehov | https://github.com/denolehov/obsidian-url-into-selection |
 
 ## External services
-- The **local AI** runs on [Ollama](https://ollama.com) with third-party models (`qwen2.5`, `bge-m3`). These are downloaded separately and are governed by their own licenses.
+- The **AI** runs on whichever provider you choose: local (Ollama, LM Studio, OpenClaw and others), a subscription (through each company's official program: Claude Code, Codex CLI, Gemini CLI, Kimi Code CLI, OpenCode) or your own API key (OpenRouter, OpenAI, Anthropic, xAI, DeepSeek, Mistral and others). None of them are bundled: every service, program and model (for example `qwen2.5` or `bge-m3`) is installed or subscribed to separately and is governed by its own terms and licenses.
 - The **Library** queries public APIs for covers and metadata: Steam, OpenLibrary, AniList, Jikan/MyAnimeList, TVMaze and Wikipedia. Downloaded covers belong to their respective owners and are not included in this repository.
+- **Videos and courses** use YouTube's public oEmbed service to fetch titles and thumbnails.
+- **Typography** can download fonts from Google Fonts when you pick them. Each font keeps its own license, mostly the SIL Open Font License.
 
 ## My own work
 I wrote these myself:
