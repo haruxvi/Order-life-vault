@@ -7,17 +7,20 @@ cssclasses:
 Raíz es el motor propio de este vault: **IA a tu elección** (local e ilimitada con Ollama, o el proveedor que quieras), entrenamiento, vida académica, agenda, hábitos y gráficos. Todo vive en tus archivos.
 
 ## 1. Activar la IA (una vez por equipo)
-En **Ajustes → Raíz → Inteligencia artificial** eliges quién responde:
-- **Local, gratis y privado**: Ollama (lo que sigue más abajo), LM Studio u OpenClaw, tu agente personal.
-- **En la nube, con tu API key**: OpenAI (GPT), Anthropic (Claude), xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq u OpenCode Zen.
-- **Otro**: cualquier servicio, bot o agente con API compatible con OpenAI. Pegas su URL y su key.
+Haz clic en **✦ IA**, abajo a la derecha, o ve a **Ajustes → Raíz → Buscar mis IAs**. Raíz revisa lo que tienes y lo muestra en tres grupos:
+- **En tu equipo**: Ollama, LM Studio, OpenClaw, Jan, llama.cpp o vLLM. Es gratis, sin límites y privado.
+- **Tus suscripciones**: Claude Pro/Max, ChatGPT Plus/Pro, Google Gemini, Kimi y OpenCode. Funcionan con el programa oficial de cada empresa (Claude Code, Codex CLI, Gemini CLI, Kimi Code CLI, OpenCode). Lo instalas e inicias sesión **una vez** en una terminal con tu cuenta, sin API key. Cada respuesta cuenta en el límite de uso de tu plan.
+- **Tus API keys**: OpenAI, Anthropic, xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq y OpenCode Zen. Encuentra las que guardaste en el Llavero de Obsidian o en tus variables de entorno.
 
-Para cada proveedor puedes:
-- Elegir un modelo rápido y uno profundo. **Cargar modelos** trae la lista real de tu cuenta.
-- Usar **Probar** para comprobar que responde.
-- Guardar la API key en el **Llavero** de Obsidian: queda cifrada en tu equipo y nunca en el vault ni en GitHub.
+En cada opción aparecen el **modelo rápido** y el **profundo** que Raíz elige solo. Con Ollama los elige según la RAM de cada equipo: en el PC de 8 GB usa uno chico y en el de 16 GB uno más grande. Los puedes cambiar ahí mismo. Con **Usar esta** queda todo configurado, y **Probar** comprueba que responde.
 
-Ojo con las suscripciones: ChatGPT Plus/Codex y Claude Pro/Max **no** incluyen la API, así que necesitas una key de pago por uso. Con un proveedor en la nube, el texto que la IA analiza se envía a ese servicio. Las notas relacionadas pueden seguir usando Ollama en local.
+Para algo que no esté en la lista (otro bot, agente o servicio), usa **Configuración manual**:
+- **Otro (API compatible con OpenAI)**: pegas su URL y su key.
+- **Otra CLI o agente**: escribes el programa y sus argumentos.
+
+Las API keys quedan cifradas en el **Llavero** de Obsidian, solo en tu equipo: nunca en el vault ni en GitHub.
+
+Si usas la IA en la nube o por suscripción, el texto que analiza se envía a ese servicio. Las notas relacionadas pueden seguir usando Ollama en local. Las suscripciones por CLI solo funcionan en el computador; en el iPhone usa una API o tu PC con Ollama.
 
 ### Con Ollama
 1. Ollama ya está instalado y corriendo en este PC. En otro equipo, instálalo desde **ollama.com**.

@@ -20,8 +20,9 @@ Todo lo hace el plugin propio **Raíz** (`.obsidian/plugins/raiz`).
 
 ### Requisitos
 1. [Obsidian](https://obsidian.md) 1.4 o superior. Activa los plugins de la comunidad al abrir el vault.
-2. Para la IA, elige en **Ajustes → Raíz → Inteligencia artificial**:
+2. Para la IA, haz clic en **✦ IA** (abajo a la derecha): Raíz busca las que tienes y elige los modelos. Las opciones son:
    - **Local**: [Ollama](https://ollama.com) (luego `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados**), LM Studio u OpenClaw.
+   - **Tu suscripción** (Claude Pro/Max, ChatGPT Plus/Pro, Gemini, Kimi, OpenCode), a través de su CLI oficial con tu sesión iniciada.
    - **En la nube, con tu API key**: OpenAI (GPT), Anthropic (Claude), xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq u OpenCode Zen.
    - **Cualquier otra API compatible con OpenAI.**
 
@@ -51,8 +52,9 @@ All of it is handled by my own plugin, **Raíz** (`.obsidian/plugins/raiz`).
 
 ### Requirements
 1. [Obsidian](https://obsidian.md) 1.4 or later. Enable community plugins when you open the vault.
-2. For the AI, pick a provider in **Settings → Raíz → Inteligencia artificial**:
+2. For the AI, click **✦ IA** (bottom right): Raíz finds what you have and picks the models. The options are:
    - **Local**: [Ollama](https://ollama.com) (then `Ctrl+P` → **Raíz: Descargar modelos de IA recomendados**), LM Studio or OpenClaw.
+   - **Your subscription** (Claude Pro/Max, ChatGPT Plus/Pro, Gemini, Kimi, OpenCode), through its official CLI with your session signed in.
    - **Cloud, with your own API key**: OpenAI (GPT), Anthropic (Claude), xAI (Grok), DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq or OpenCode Zen.
    - **Any other OpenAI-compatible API.**
 

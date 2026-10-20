@@ -2,7 +2,8 @@
   "ai": {
     "provider": "ollama",
     "providers": {},
-    "embedVia": "ollama"
+    "embedVia": "ollama",
+    "configured": true
   },
   "fonts": {
     "text": "",

@@ -24,6 +24,13 @@ const AI_PROVIDERS = {
   groq: { label: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, json: true, fast: 'llama-3.3-70b-versatile', deep: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
   opencode: { label: 'OpenCode Zen', kind: 'openai', baseUrl: 'https://opencode.ai/zen/v1', needsKey: true, keyUrl: 'https://opencode.ai/zen', hint: 'Usa tu API key de OpenCode Zen y "Cargar modelos" para elegir el modelo.' },
   openclaw: { label: 'OpenClaw (tu agente personal)', kind: 'openai', local: true, baseUrl: 'http://127.0.0.1:18789/v1', fast: 'openclaw:main', deep: 'openclaw:main', hint: 'Activa en OpenClaw gateway.http.endpoints.chatCompletions.enabled. El modelo es openclaw:<id del agente> (ej. openclaw:main), y en "API key" va el token del gateway si lo usas. Revisa el puerto de tu gateway.' },
+  // Suscripciones: se usan a través del programa oficial de cada empresa, con tu sesión iniciada (sin API key)
+  claude_cli: { label: 'Claude Pro / Max (con Claude Code)', kind: 'cli', bin: 'claude', args: ['-p', '--output-format', 'text', '--model', '{model}'], stdin: true, fast: 'haiku', deep: 'sonnet', models: ['haiku', 'sonnet', 'opus'], login: 'claude (y luego /login)', install: 'https://claude.com/claude-code', hint: 'Usa tu plan de Claude a través de Claude Code. Instálalo, abre una terminal, escribe "claude" e inicia sesión con tu cuenta. Cada respuesta cuenta en el límite de uso de tu plan.' },
+  codex_cli: { label: 'ChatGPT Plus / Pro (con Codex CLI)', kind: 'cli', bin: 'codex', args: ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '-m', '{model}', 'Lee la petición que llega por la entrada estándar y respóndela.'], stdin: true, login: 'codex login', install: 'https://developers.openai.com/codex/cli', hint: 'Usa tu plan de ChatGPT a través de Codex CLI. Instálalo y ejecuta "codex login" para iniciar sesión con tu cuenta de ChatGPT. Si dejas el modelo vacío, usa el que tenga tu plan.' },
+  gemini_cli: { label: 'Google Gemini (con Gemini CLI)', kind: 'cli', bin: 'gemini', args: ['-m', '{model}', '-p', 'Lee la petición que llega por la entrada estándar y respóndela.'], stdin: true, fast: 'gemini-2.5-flash', deep: 'gemini-2.5-pro', models: ['gemini-2.5-flash', 'gemini-2.5-pro'], login: 'gemini', install: 'https://geminicli.com', hint: 'Usa tu cuenta de Google (tiene un plan gratis) a través de Gemini CLI. Instálalo, escribe "gemini" en una terminal e inicia sesión.' },
+  kimi_cli: { label: 'Kimi (con Kimi Code CLI)', kind: 'cli', bin: 'kimi', args: ['--output-format', 'text', '-p', 'Lee el archivo {archivo} y responde exactamente lo que pide. No modifiques archivos.'], stdin: false, login: 'kimi (y luego /login)', install: 'https://www.kimi.com/code', hint: 'Usa tu membresía de Kimi a través de Kimi Code CLI. Instálalo, escribe "kimi" en una terminal e inicia sesión con /login.' },
+  opencode_cli: { label: 'OpenCode (con su CLI y las cuentas que conectes)', kind: 'cli', bin: 'opencode', args: ['run', '-m', '{model}', 'Lee el archivo {archivo} y responde exactamente lo que pide. No modifiques archivos.'], stdin: false, login: 'opencode auth login', install: 'https://opencode.ai', hint: 'Usa los proveedores que conectaste en OpenCode. El modelo va como proveedor/modelo (ej. opencode/grok-code); vacío = el que tengas por defecto.' },
+  custom_cli: { label: 'Otra CLI o agente (comando propio)', kind: 'cli', bin: '', args: [], stdin: true, hint: 'Escribe el programa y sus argumentos. La petición llega por la entrada estándar; usa {archivo} si el programa la necesita en un archivo y {model} donde va el modelo.' },
   custom: { label: 'Otro (cualquier API compatible con OpenAI)', kind: 'openai', baseUrl: '', hint: 'Sirve para vLLM, llama.cpp, Jan, LocalAI, LiteLLM, Azure, Mistral, Together, Fireworks, agentes con API propia… Pon la URL base que termina en /v1.' },
 };
 
@@ -1032,6 +1039,134 @@ class BackgroundModal extends Modal {
   }
 }
 
+/** Asistente de IA: escanea qué tienes (local, suscripciones, API keys) y lo configura con un clic. */
+class AiScanModal extends Modal {
+  constructor(plugin, onDone) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.onDone = onDone;
+  }
+  onOpen() {
+    this.modalEl.addClass('raiz-ai-modal');
+    this.scan();
+  }
+  async scan() {
+    const p = this.plugin;
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h3', { text: 'Tus IAs' });
+    const status = contentEl.createDiv({ cls: 'raiz-muted', text: 'Buscando…' });
+    let found = [];
+    try {
+      found = await p.scanAI((t) => status.setText(t));
+    } catch (e) {
+      status.setText(`No pude terminar la búsqueda: ${e.message}`);
+    }
+    p.lastScan = found;
+    this.render(found);
+  }
+  render(found) {
+    const p = this.plugin;
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h3', { text: 'Tus IAs' });
+    contentEl.createDiv({
+      cls: 'raiz-muted',
+      text: found.length ? `Encontré ${found.length} opción(es). Elige una y Raíz configura los modelos y parámetros por ti. Puedes cambiar cuando quieras.` : 'No encontré ninguna IA todavía. Abajo tienes cómo agregar la que prefieras.',
+    });
+    const current = p.aiId();
+    const groups = [
+      ['local', 'En tu equipo', 'Gratis, sin límites y privado: tus notas no salen de tu PC.'],
+      ['sub', 'Tus suscripciones', 'Usa tu plan (Claude, ChatGPT, Gemini, Kimi…) a través de su programa oficial. Cada respuesta cuenta en el límite de tu plan.'],
+      ['api', 'Tus API keys', 'Pago por uso en la cuenta del proveedor.'],
+    ];
+    for (const [type, title, desc] of groups) {
+      const items = found.filter((f) => f.type === type);
+      if (!items.length) continue;
+      contentEl.createEl('h4', { cls: 'raiz-ai-group', text: title });
+      contentEl.createDiv({ cls: 'raiz-muted raiz-ai-group-desc', text: desc });
+      const grid = contentEl.createDiv({ cls: 'raiz-ai-grid' });
+      for (const f of items) {
+        const card = grid.createDiv({ cls: 'raiz-ai-card' + (f.id === current ? ' is-current' : '') + (f.ok === false ? ' is-bad' : '') });
+        card.createDiv({ cls: 'raiz-ai-name', text: f.label });
+        const det = [];
+        if (f.models.length) det.push(`${f.models.length} modelo(s)`);
+        if (f.path) det.push('instalado');
+        if (f.keyFrom) det.push(`key: ${f.keyFrom}`);
+        if (f.ok === false) det.push('la key no funcionó');
+        card.createDiv({ cls: 'raiz-ai-det', text: det.join(' · ') });
+        const m = p.autoModels(f);
+        const names = f.models.map((x) => x.name).filter((n) => !/embed|bge|nomic|rerank|whisper|tts|guard/i.test(n));
+        const pick = (label, key) => {
+          const row = card.createDiv({ cls: 'raiz-ai-pick' });
+          row.createSpan({ text: label });
+          if (names.length > 1) {
+            const sel = row.createEl('select', { cls: 'dropdown' });
+            for (const n of names) sel.createEl('option', { value: n, text: n });
+            sel.value = names.includes(m[key]) ? m[key] : names[0];
+            m[key] = sel.value;
+            sel.addEventListener('change', () => (m[key] = sel.value));
+          } else row.createSpan({ cls: 'raiz-ai-model', text: m[key] || 'el de tu cuenta' });
+        };
+        pick('Rápido', 'fast');
+        pick('Profundo', 'deep');
+        const btn = card.createEl('button', { cls: f.id === current ? '' : 'mod-cta', text: f.id === current ? 'Usar con estos modelos' : 'Usar esta' });
+        btn.disabled = f.ok === false;
+        btn.addEventListener('click', () =>
+          p.run(async () => {
+            await p.useScanned(f, m);
+            this.close();
+            this.onDone?.();
+          })
+        );
+      }
+    }
+    // Lo que no está: cómo agregarlo
+    const missing = contentEl.createEl('details', { cls: 'raiz-ai-more' });
+    missing.createEl('summary', { text: 'Agregar otra IA' });
+    const have = new Set(found.map((f) => f.id));
+    const list = missing.createDiv({ cls: 'raiz-ai-add' });
+    for (const [id, pv] of Object.entries(AI_PROVIDERS)) {
+      if (have.has(id) || id === 'custom' || id === 'custom_cli') continue;
+      const row = list.createDiv({ cls: 'raiz-ai-add-row' });
+      const info = row.createDiv();
+      info.createDiv({ cls: 'raiz-ai-name', text: pv.label });
+      info.createDiv({ cls: 'raiz-muted', text: pv.kind === 'cli' ? `Instala el programa e inicia sesión con: ${pv.login || pv.bin}` : pv.local ? 'Ábrelo en tu PC y vuelve a buscar.' : pv.kind === 'ollama' ? 'Instálalo desde ollama.com.' : 'Pega tu API key para usarlo.' });
+      const act = row.createDiv({ cls: 'raiz-ai-add-act' });
+      if (pv.kind === 'openai' || pv.kind === 'anthropic') {
+        if (!pv.local) {
+          const inp = act.createEl('input', { cls: 'raiz-input', attr: { type: 'password', placeholder: 'API key' } });
+          act.createEl('button', { cls: 'mod-cta', text: 'Guardar' }).addEventListener('click', () => {
+            if (!inp.value.trim()) return;
+            p.setApiKey(id, inp.value);
+            new Notice(`Key de ${pv.label} guardada en el Llavero.`);
+            this.scan();
+          });
+        }
+        if (pv.keyUrl) act.createEl('button', { text: 'Conseguir key' }).addEventListener('click', () => window.open(pv.keyUrl));
+      }
+      const url = pv.install || (pv.kind === 'ollama' ? 'https://ollama.com' : id === 'lmstudio' ? 'https://lmstudio.ai' : null);
+      if (url) act.createEl('button', { text: pv.kind === 'cli' ? 'Instalar' : 'Descargar' }).addEventListener('click', () => window.open(url));
+      if (pv.kind === 'cli' && pv.login)
+        act.createEl('button', { text: 'Copiar comando' }).addEventListener('click', () => {
+          navigator.clipboard.writeText(pv.login.split(' (')[0]);
+          new Notice(`Copiado: ${pv.login}. Pégalo en una terminal para iniciar sesión.`);
+        });
+    }
+    const bar = contentEl.createDiv({ cls: 'raiz-ai-bar' });
+    bar.createEl('button', { text: 'Buscar de nuevo' }).addEventListener('click', () => this.scan());
+    bar.createEl('button', { text: 'Configuración manual' }).addEventListener('click', () => {
+      p.settings.ai.showAdvanced = true;
+      p.saveSettings();
+      this.close();
+      p.openSettings();
+    });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 // ───────────────────────────── Plugin principal ─────────────────────────────
 
 module.exports = class RaizPlugin extends Plugin {
@@ -1046,11 +1181,15 @@ module.exports = class RaizPlugin extends Plugin {
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass('raiz-status');
     this.statusEl.setText('✦ IA…');
-    this.statusEl.onClickEvent(() => this.checkAI(true));
+    this.statusEl.onClickEvent(async () => {
+      const st = await this.checkAI(true);
+      if (!st.ok) new AiScanModal(this).open();
+    });
     this.loadUserFonts().then(() => this.applyFonts());
 
     this.addCommand({ id: 'open-settings', name: 'Abrir ajustes', callback: () => this.openSettings() });
     this.addCommand({ id: 'check-ollama', name: 'Comprobar la IA', callback: () => this.checkAI(true) });
+    this.addCommand({ id: 'ai-scan', name: 'IA: buscar mis IAs y configurarlas', callback: () => new AiScanModal(this).open() });
     this.addCommand({ id: 'pull-models', name: 'Descargar modelos de IA recomendados', callback: () => this.pullModels() });
     this.addCommand({ id: 'open-today', name: 'Abrir la nota de hoy', callback: () => this.openToday() });
     this.addCommand({ id: 'new-course', name: 'Nueva asignatura', callback: () => this.newCourse() });
@@ -1122,6 +1261,11 @@ module.exports = class RaizPlugin extends Plugin {
       this.layoutReadyAt = Date.now();
       this.registerEvent(this.app.vault.on('create', (f) => this.onLinkedNoteCreated(f).catch((e) => console.error('[Raíz]', e))));
       if (this.aiId() !== 'ollama') this.checkAI(false);
+      if (!this.settings.ai?.configured)
+        this.checkAI(false).then((r) => {
+          if (r.ok) ((this.settings.ai.configured = true), this.saveSettings());
+          else new Notice('✦ Configura tu IA: haz clic en "✦ IA" abajo a la derecha y Raíz buscará las que tienes.', 12000);
+        });
       const st = this.embedUsesProvider() ? { ok: true, installed: [] } : await this.checkOllama(false);
       // Indexado en segundo plano para las conexiones (solo si el modelo de embeddings está disponible)
       const hasEmbed = this.embedUsesProvider() || (st.ok && st.installed.some((m) => m.replace(/:latest$/, '') === this.settings.embedModel.replace(/:latest$/, '')));
@@ -1196,6 +1340,230 @@ module.exports = class RaizPlugin extends Plugin {
     }
   }
 
+  // ───────────── Suscripciones vía CLIs oficiales (Claude Code, Codex, Gemini CLI, Kimi Code, OpenCode…) ─────────────
+  /** Busca un ejecutable en el PATH y en las carpetas donde suelen instalarse estas CLIs. */
+  findBin(name) {
+    if (!name) return null;
+    let fs, path, os;
+    try {
+      fs = require('fs');
+      path = require('path');
+      os = require('os');
+    } catch (e) {
+      return null; // móvil
+    }
+    if (path.isAbsolute(name)) return fs.existsSync(name) ? name : null;
+    const win = process.platform === 'win32';
+    const home = os.homedir();
+    const env = process.env;
+    const dirs = String(env.PATH || env.Path || '')
+      .split(path.delimiter)
+      .concat(
+        win
+          ? [path.join(home, '.local', 'bin'), path.join(env.APPDATA || '', 'npm'), path.join(home, '.bun', 'bin'), path.join(home, '.cargo', 'bin'), path.join(env.LOCALAPPDATA || '', 'Programs', name), path.join(env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links'), path.join(home, 'scoop', 'shims')]
+          : [path.join(home, '.local', 'bin'), path.join(home, '.npm-global', 'bin'), path.join(home, '.bun', 'bin'), path.join(home, '.cargo', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin']
+      )
+      .filter(Boolean);
+    const exts = win ? ['.exe', '.cmd', '.bat', ''] : [''];
+    for (const d of dirs) for (const e of exts) {
+      const p = path.join(d, name + e);
+      try {
+        if (fs.statSync(p).isFile()) return p;
+      } catch (err) {
+        /* no está */
+      }
+    }
+    return null;
+  }
+  cliArgs(c, model, promptFile) {
+    const out = [];
+    const args = Array.isArray(c.args) ? c.args : String(c.args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"|"$/g, '')) || [];
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (a === '{model}') {
+        if (!model) out.pop(); // sin modelo: se quita también su flag (ej. --model)
+        else out.push(model);
+      } else out.push(a.replace('{archivo}', promptFile));
+    }
+    return out;
+  }
+  /** Ejecuta la CLI en una carpeta vacía (no toca tu vault) y devuelve lo que responde. */
+  async chatCli({ system, prompt, schema, model }) {
+    let cp, fs, path, os;
+    try {
+      cp = require('child_process');
+      fs = require('fs');
+      path = require('path');
+      os = require('os');
+    } catch (e) {
+      throw new Error('Las suscripciones por CLI solo funcionan en el computador. En el celular usa un proveedor con API o tu PC vía Ollama.');
+    }
+    const c = this.aiConf();
+    const bin = this.findBin(c.bin);
+    if (!bin) throw new Error(`No encuentro el programa "${c.bin || '(sin definir)'}"${c.install ? `. Descárgalo en ${c.install}` : ''} e inicia sesión una vez con: ${c.login || c.bin}`);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'raiz-ia-'));
+    const full =
+      `INSTRUCCIONES:\n${system || this.systemPrompt()}\n` +
+      (schema ? `Responde SOLO con un objeto JSON válido (sin texto alrededor ni bloques de código) que siga este esquema: ${JSON.stringify(schema)}\n` : '') +
+      `No uses herramientas, no crees ni modifiques archivos y no expliques lo que vas a hacer: responde directamente.\n\nPETICIÓN:\n${prompt}`;
+    const file = path.join(dir, 'peticion.md');
+    fs.writeFileSync(file, full, 'utf8');
+    const args = this.cliArgs(c, model, file);
+    const isCmd = /\.(cmd|bat)$/i.test(bin);
+    // Los .cmd de npm necesitan cmd.exe; los argumentos van entre comillas (son cortos: la petición va por stdin o archivo)
+    const q = (a) => `"${String(a).replace(/"/g, '""')}"`;
+    const child = isCmd
+      ? cp.spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${[q(bin), ...args.map(q)].join(' ')}"`], { cwd: dir, windowsHide: true, windowsVerbatimArguments: true, env: process.env })
+      : cp.spawn(bin, args, { cwd: dir, windowsHide: true, env: process.env });
+    return await new Promise((resolve, reject) => {
+      let out = '';
+      let err = '';
+      const kill = setTimeout(() => {
+        child.kill();
+        reject(new Error(`${c.label} tardó más de 5 minutos.`));
+      }, 300000);
+      child.stdout.on('data', (d) => (out += d));
+      child.stderr.on('data', (d) => (err += d));
+      child.on('error', (e) => (clearTimeout(kill), reject(new Error(`No pude abrir ${c.bin}: ${e.message}`))));
+      child.on('close', (code) => {
+        clearTimeout(kill);
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+        } catch (e) {
+          /* nada */
+        }
+        const clean = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').trim();
+        if (code !== 0 && !clean(out)) {
+          const e = clean(err).split('\n').slice(-6).join('\n');
+          if (/log ?in|auth|credential|unauthori|sign in/i.test(e)) return reject(new Error(`${c.label}: falta iniciar sesión. Abre una terminal y ejecuta "${c.login || c.bin}".`));
+          return reject(new Error(`${c.label} (código ${code}): ${e || 'sin detalles'}`));
+        }
+        resolve(clean(out));
+      });
+      if (c.stdin) child.stdin.end(full, 'utf8');
+      else child.stdin.end();
+    });
+  }
+  // ───────────── Escáner: qué IAs tienes disponibles (local, suscripciones y API keys) ─────────────
+  envKeyFor(id) {
+    const vars = { openai: ['OPENAI_API_KEY'], anthropic: ['ANTHROPIC_API_KEY'], xai: ['XAI_API_KEY', 'GROK_API_KEY'], deepseek: ['DEEPSEEK_API_KEY'], kimi: ['MOONSHOT_API_KEY', 'KIMI_API_KEY'], qwen: ['DASHSCOPE_API_KEY', 'QWEN_API_KEY'], gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'], openrouter: ['OPENROUTER_API_KEY'], groq: ['GROQ_API_KEY'], opencode: ['OPENCODE_API_KEY'] }[id];
+    try {
+      for (const v of vars || []) if (process.env[v]) return { key: process.env[v], from: v };
+    } catch (e) {
+      /* móvil */
+    }
+    return null;
+  }
+  /** Revisa el equipo y tus cuentas. No envía tus notas a nadie: solo pregunta qué modelos hay. */
+  async scanAI(onStep) {
+    const found = [];
+    const probe = async (url, headers = {}) => {
+      try {
+        const r = await Promise.race([requestUrl({ url, method: 'GET', headers, throw: false }), new Promise((_, rej) => setTimeout(() => rej(new Error('t')), 2500))]);
+        return r.status < 400 ? r : null;
+      } catch (e) {
+        return null;
+      }
+    };
+    onStep?.('Buscando IA local en tu equipo…');
+    const o = await probe(`${this.ollamaUrl()}/api/tags`);
+    if (o) found.push({ id: 'ollama', type: 'local', label: AI_PROVIDERS.ollama.label, models: (o.json.models || []).map((m) => ({ name: m.name, size: m.size || 0, params: m.details?.parameter_size || '' })) });
+    const locals = [
+      ['lmstudio', 'LM Studio', 'http://127.0.0.1:1234/v1'],
+      ['openclaw', 'OpenClaw', 'http://127.0.0.1:18789/v1'],
+      ['custom', 'Jan', 'http://127.0.0.1:1337/v1'],
+      ['custom', 'llama.cpp / LocalAI', 'http://127.0.0.1:8080/v1'],
+      ['custom', 'vLLM', 'http://127.0.0.1:8000/v1'],
+    ];
+    // Todos los servidores locales a la vez (cada uno espera como máximo 2,5 s)
+    const replies = await Promise.all(locals.map(([id, , url]) => probe(`${url}/models`, id === 'openclaw' && this.apiKey('openclaw') ? { Authorization: `Bearer ${this.apiKey('openclaw')}` } : {})));
+    locals.forEach(([id, name, url], i) => {
+      const r = replies[i];
+      if (r) found.push({ id, type: 'local', label: id === 'custom' ? `${name} (local)` : AI_PROVIDERS[id].label, baseUrl: url, models: (r.json?.data || []).map((m) => ({ name: m.id })) });
+    });
+    onStep?.('Buscando tus suscripciones (Claude, ChatGPT, Gemini, Kimi, OpenCode)…');
+    for (const [id, pv] of Object.entries(AI_PROVIDERS)) {
+      if (pv.kind !== 'cli' || !pv.bin) continue;
+      const path = this.findBin(this.settings.ai?.providers?.[id]?.bin || pv.bin);
+      if (path) found.push({ id, type: 'sub', label: pv.label, path, models: (pv.models || []).map((name) => ({ name })) });
+    }
+    onStep?.('Revisando tus API keys…');
+    for (const [id, pv] of Object.entries(AI_PROVIDERS)) {
+      if (pv.kind === 'cli' || pv.local || id === 'custom' || id === 'ollama') continue;
+      const own = this.apiKey(id);
+      const env = own ? null : this.envKeyFor(id);
+      const key = own || env?.key;
+      if (!key) continue;
+      let models = [];
+      let ok = true;
+      try {
+        models = (await this.listModels(id, key)).map((name) => ({ name }));
+      } catch (e) {
+        ok = false;
+      }
+      found.push({ id, type: 'api', label: pv.label, keyFrom: own ? 'Llavero' : env.from, envKey: env?.key, ok, models });
+    }
+    return found;
+  }
+  /** Elige el modelo rápido y el profundo según lo que tengas (y la RAM, si es local). */
+  autoModels(f) {
+    const P = AI_PROVIDERS[f.id] || {};
+    const chat = f.models.filter((m) => !/embed|bge|nomic|rerank|whisper|tts|dall-?e|image|moderation|audio|realtime|transcri|guard/i.test(m.name));
+    const names = chat.map((m) => m.name);
+    if (f.type === 'sub') return { fast: P.fast || '', deep: P.deep || P.fast || '' };
+    if (f.id === 'ollama') {
+      const ram = this.totalRamGB() || 8;
+      const fit = chat.filter((m) => !m.size || m.size / 1024 ** 3 < ram * 0.45).sort((a, b) => a.size - b.size);
+      const list = fit.length ? fit : chat.slice().sort((a, b) => a.size - b.size);
+      const fast = list.find((m) => m.size / 1024 ** 3 >= 1.2) || list[0];
+      return { fast: fast?.name || '', deep: list[list.length - 1]?.name || fast?.name || '' };
+    }
+    if (!names.length) return { fast: P.fast || '', deep: P.deep || P.fast || '' };
+    const has = (x) => x && names.includes(x);
+    const fast = has(P.fast) ? P.fast : names.find((n) => /mini|flash|haiku|lite|small|turbo|fast|nano|instant|8b/i.test(n)) || names[0];
+    const deep = has(P.deep) ? P.deep : names.find((n) => /pro|opus|sonnet|max|large|70b|405b|plus|reasoner|-4\b|k2/i.test(n) && !/mini|lite|nano/i.test(n)) || fast;
+    return { fast, deep };
+  }
+  /** Deja configurada la IA elegida en el escáner, con sus modelos y parámetros. */
+  async useScanned(f, models = this.autoModels(f)) {
+    const s = this.settings;
+    s.ai = s.ai || { provider: 'ollama', providers: {}, embedVia: 'ollama' };
+    s.ai.providers = s.ai.providers || {};
+    s.ai.provider = f.id;
+    if (f.id === 'ollama') {
+      const ram = this.totalRamGB() || 8;
+      // El vault se usa en equipos con distinta RAM: se mantiene "automático" (este equipo usa lo elegido;
+      // uno con más RAM usa el modelo más grande que tengas instalado)
+      s.fastModel = models.fast || s.fastModel;
+      const chat = f.models.filter((m) => !/embed|bge|nomic|rerank/i.test(m.name)).sort((a, b) => a.size - b.size);
+      if (ram < s.lowRamThresholdGB) {
+        s.lowRamDeepModel = models.deep || s.lowRamDeepModel;
+        const top = chat[chat.length - 1];
+        const named = top && chat.find((m) => m.size === top.size && !/:latest$/.test(m.name)); // "qwen2.5:7b" mejor que "qwen2.5:latest"
+        s.deepModel = (named || top)?.name || s.deepModel;
+      } else s.deepModel = models.deep || s.deepModel;
+      s.modelMode = 'auto';
+      s.numCtx = ram >= 15 ? 16384 : 8192; // más RAM = puede leer más notas a la vez
+    } else {
+      const own = (s.ai.providers[f.id] = s.ai.providers[f.id] || {});
+      own.fast = models.fast || '';
+      own.deep = models.deep || '';
+      if (f.baseUrl) own.baseUrl = f.baseUrl;
+      if (f.envKey && !this.apiKey(f.id)) this.setApiKey(f.id, f.envKey); // la key de tu variable de entorno pasa al Llavero
+    }
+    // Notas relacionadas: Ollama local si tiene un modelo de embeddings; si no, el proveedor (cuando lo soporta)
+    const ol = this.lastScan?.find((x) => x.id === 'ollama');
+    const emb = ol?.models.find((m) => /bge|nomic|embed|e5|gte|arctic/i.test(m.name));
+    if (emb) {
+      s.ai.embedVia = 'ollama';
+      s.embedModel = emb.name.replace(/:latest$/, '');
+    } else if (AI_PROVIDERS[f.id]?.embed) s.ai.embedVia = 'provider';
+    s.ai.configured = true;
+    await this.saveSettings();
+    await this.checkAI(false);
+    new Notice(`✅ IA configurada: ${f.label}\nRápido: ${this.modelFor('fast') || 'el de tu cuenta'}\nProfundo: ${this.modelFor('deep') || 'el de tu cuenta'}`, 8000);
+  }
+
   // ───────────── Proveedores de IA: local (Ollama, LM Studio…) o en la nube (OpenAI, Claude, DeepSeek…) ─────────────
   aiProviders() {
     return AI_PROVIDERS;
@@ -1235,8 +1603,7 @@ module.exports = class RaizPlugin extends Plugin {
       new Notice(`No pude guardar la key: ${e.message}`);
     }
   }
-  aiHeaders(c, id) {
-    const key = this.apiKey(id);
+  aiHeaders(c, id, key = this.apiKey(id)) {
     if (c.kind === 'anthropic') return { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
     const h = key ? { Authorization: `Bearer ${key}` } : {};
     if (id === 'openrouter') Object.assign(h, { 'HTTP-Referer': 'https://obsidian.md', 'X-Title': 'Raiz' });
@@ -1269,6 +1636,7 @@ module.exports = class RaizPlugin extends Plugin {
   async chatRemote({ system, prompt, schema, temperature, maxTokens, model }) {
     const id = this.aiId();
     const c = this.aiConf(id);
+    if (c.kind === 'cli') return this.chatCli({ system, prompt, schema, model });
     if (!c.baseUrl) throw new Error('Falta la URL del proveedor de IA (Ajustes → Raíz → IA).');
     if (c.needsKey && !this.apiKey(id)) throw new Error(`Falta tu API key de ${c.label} (Ajustes → Raíz → IA).`);
     const sys = (system || this.systemPrompt()) + (schema ? `\nResponde SOLO con un objeto JSON válido (sin texto alrededor ni bloques de código) que siga este esquema: ${JSON.stringify(schema)}` : '');
@@ -1297,14 +1665,15 @@ module.exports = class RaizPlugin extends Plugin {
     throw new Error(`${c.label} rechazó la petición.`);
   }
   /** Lista de modelos del proveedor elegido (para elegirlos en los ajustes). */
-  async listModels(id = this.aiId()) {
+  async listModels(id = this.aiId(), key) {
     const c = this.aiConf(id);
+    if (c.kind === 'cli') return (c.models || []).slice();
     if (id === 'ollama') {
       const res = await this.aiRequest(`${this.ollamaUrl()}/api/tags`, { method: 'GET' });
       if (res.status >= 400) throw new Error(this.aiError(res));
       return (res.json.models || []).map((m) => m.name).sort();
     }
-    const res = await this.aiRequest(`${c.baseUrl}/models`, { method: 'GET', headers: this.aiHeaders(c, id) });
+    const res = await this.aiRequest(`${c.baseUrl}/models`, { method: 'GET', headers: this.aiHeaders(c, id, key || this.apiKey(id)) });
     if (res.status >= 400) throw new Error(`${c.label}: ${this.aiError(res)}`);
     return (res.json?.data || res.json?.models || []).map((m) => String(m.id || m.name || '').replace(/^models\//, '')).filter(Boolean).sort();
   }
@@ -1312,6 +1681,12 @@ module.exports = class RaizPlugin extends Plugin {
   async checkAI(verbose) {
     if (this.aiId() === 'ollama') return this.checkOllama(verbose);
     const c = this.aiConf();
+    if (c.kind === 'cli') {
+      const bin = this.findBin(c.bin);
+      this.statusEl?.setText(bin ? `✦ IA lista · ${c.label.split(' (')[0]}` : `✦ IA: falta ${c.bin || 'el programa'}`);
+      if (verbose) new Notice(bin ? `✅ ${c.label}: encontré ${bin}.\nUsa "Probar" para comprobar que tu sesión está iniciada.` : `No encuentro "${c.bin}". Instálalo e inicia sesión con: ${c.login || c.bin}`, 9000);
+      return { ok: !!bin, installed: [], missing: [] };
+    }
     try {
       if (c.needsKey && !this.apiKey()) throw new Error('falta la API key');
       const models = await this.listModels();
@@ -1459,7 +1834,7 @@ module.exports = class RaizPlugin extends Plugin {
   async chat({ system, prompt, tier = 'fast', schema = null, temperature = 0.5, label = 'Pensando', maxTokens }) {
     const model = this.modelFor(tier);
     if (this.aiId() !== 'ollama') {
-      if (!model) throw new Error(`Elige un modelo para ${this.aiConf().label} en Ajustes → Raíz → Inteligencia artificial.`);
+      if (!model && this.aiConf().kind !== 'cli') throw new Error(`Elige un modelo para ${this.aiConf().label} en Ajustes → Raíz → Inteligencia artificial.`);
       const n = new Notice(`✦ ${label} · ${model}…`, 0);
       try {
         const content = cleanResponse(await this.chatRemote({ system, prompt, schema, temperature, maxTokens, model }));
@@ -6366,6 +6741,21 @@ class RaizSettingTab extends PluginSettingTab {
     containerEl.createEl('h3', { text: 'Inteligencia artificial' });
     s.ai = s.ai || { provider: 'ollama', providers: {}, embedVia: 'ollama' };
     s.ai.providers = s.ai.providers || {};
+    // Resumen simple: qué IA usas ahora y un botón para que Raíz busque las que tienes
+    const cur = p.aiConf();
+    const now = new Setting(containerEl)
+      .setName(`Ahora: ${cur.label}`)
+      .setDesc(`Rápido: ${p.modelFor('fast') || 'el de tu cuenta'} · Profundo: ${p.modelFor('deep') || 'el de tu cuenta'}${cur.local ? ' · tus notas no salen de tu equipo' : ''}`);
+    now.settingEl.addClass('raiz-ai-now');
+    now
+      .addButton((b) => b.setButtonText('Buscar mis IAs').setCta().onClick(() => new AiScanModal(p, () => this.display()).open()))
+      .addButton((b) => b.setButtonText('Probar').onClick(() => p.run(() => p.testAI())));
+    containerEl.createDiv({ cls: 'setting-item-description', text: 'Raíz revisa qué tienes: IA local (Ollama, LM Studio, OpenClaw…), tus suscripciones (Claude, ChatGPT, Gemini, Kimi, OpenCode) y tus API keys, y elige los modelos y parámetros por ti.' });
+    new Setting(containerEl)
+      .setName('Configuración manual')
+      .setDesc('Elegir proveedor, URL, modelos y comandos a mano.')
+      .addToggle((t) => t.setValue(!!s.ai.showAdvanced).onChange(async (v) => ((s.ai.showAdvanced = v), await save(), this.display())));
+    if (s.ai.showAdvanced) {
     new Setting(containerEl)
       .setName('Proveedor')
       .setDesc('Elige quién responde: un modelo local (tus notas no salen de tu equipo) o uno en la nube (se envía el texto necesario a ese servicio).')
@@ -6385,6 +6775,30 @@ class RaizSettingTab extends PluginSettingTab {
       const own = (s.ai.providers[id] = s.ai.providers[id] || {});
       if (c.hint) containerEl.createDiv({ cls: 'setting-item-description raiz-ai-hint', text: c.hint });
       if (!c.local) containerEl.createDiv({ cls: 'raiz-ai-warn', text: `Privacidad: cuando usas la IA, el texto de las notas que analiza se envía a ${c.label}. Con Ollama, LM Studio u OpenClaw en tu PC se queda en tu equipo.` });
+      if (c.kind === 'cli') {
+        const bin = p.findBin(c.bin);
+        new Setting(containerEl)
+          .setName('Programa')
+          .setDesc(bin ? `Encontrado: ${bin}` : `No lo encuentro${c.install ? `. Instálalo desde ${c.install}` : ''}. También puedes escribir la ruta completa.`)
+          .addText((t) => t.setPlaceholder(preset.bin || 'ej: mi-agente').setValue(own.bin || '').onChange(async (v) => ((own.bin = v.trim()), await save())));
+        new Setting(containerEl)
+          .setName('Argumentos')
+          .setDesc('{model} = el modelo · {archivo} = archivo con la petición. Si no usas {archivo}, la petición llega por la entrada estándar.')
+          .addText((t) => {
+            t.setPlaceholder((preset.args || []).map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(' ')).setValue(own.args || '').onChange(async (v) => ((own.args = v.trim()), await save()));
+            t.inputEl.style.width = '100%';
+          });
+        if (c.login)
+          new Setting(containerEl)
+            .setName('Iniciar sesión')
+            .setDesc(`Una sola vez, en una terminal: ${c.login}`)
+            .addButton((b) =>
+              b.setButtonText('Copiar comando').onClick(() => {
+                navigator.clipboard.writeText(c.login.split(' (')[0]);
+                new Notice('Comando copiado. Pégalo en una terminal.');
+              })
+            );
+      } else {
       new Setting(containerEl)
         .setName('URL base')
         .setDesc(preset.baseUrl ? `Por defecto: ${preset.baseUrl}` : 'La dirección de la API, normalmente termina en /v1.')
@@ -6395,6 +6809,7 @@ class RaizSettingTab extends PluginSettingTab {
         t.setPlaceholder(c.needsKey ? 'Pega tu key' : 'Opcional').setValue(p.apiKey(id)).onChange((v) => p.setApiKey(id, v));
       });
       if (c.keyUrl) key.addButton((b) => b.setButtonText('Conseguir una key').onClick(() => window.open(c.keyUrl)));
+      }
       const listId = `raiz-models-${id}`;
       const dl = containerEl.createEl('datalist', { attr: { id: listId } });
       const field = (k, name, desc) =>
@@ -6483,6 +6898,7 @@ class RaizSettingTab extends PluginSettingTab {
       .setName('Contexto (tokens)')
       .setDesc('Más contexto = lee más notas a la vez, pero usa más RAM. 8192 es buen equilibrio.')
       .addText((t) => t.setValue(String(s.numCtx)).onChange(async (v) => ((s.numCtx = clamp(parseInt(v, 10) || 8192, 2048, 65536)), await save())));
+    }
     }
     new Setting(containerEl)
       .setName('Sobre ti')
