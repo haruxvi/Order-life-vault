@@ -149,6 +149,7 @@ const DEFAULT_SETTINGS = {
     dashboard: '00 Dashboard',
     covers: '06 Plantillas/Portadas',
     knowledge: '12 Conocimiento',
+    wiki: '13 Wiki',
     inbox: '00 Bandeja',
   },
 };
@@ -1193,6 +1194,64 @@ class AiScanModal extends Modal {
   }
 }
 
+/** Preguntar a la wiki y, si la respuesta vale la pena, guardarla como página. */
+class WikiAskModal extends Modal {
+  constructor(plugin) {
+    super(plugin.app);
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    this.modalEl.addClass('raiz-media-modal');
+    contentEl.createEl('h3', { text: 'Preguntar a la wiki' });
+    const input = contentEl.createEl('textarea', { cls: 'raiz-input raiz-ask', attr: { rows: '3', placeholder: 'Ej: ¿Qué diferencia hay entre heap y stack? · ¿Qué tienen en común los libros que leí este año?' } });
+    const row = contentEl.createDiv({ cls: 'raiz-lib-bar' });
+    const btn = row.createEl('button', { cls: 'mod-cta', text: 'Preguntar' });
+    const out = contentEl.createDiv({ cls: 'raiz-ask-out' });
+    const go = async () => {
+      const q = input.value.trim();
+      if (!q) return;
+      btn.disabled = true;
+      out.empty();
+      out.createDiv({ cls: 'raiz-muted', text: 'Leyendo el índice y las páginas…' });
+      try {
+        const { answer, pages } = await this.plugin.askWiki(q);
+        out.empty();
+        const md = out.createDiv({ cls: 'raiz-ask-answer' });
+        await MarkdownRenderer.render(this.app, answer, md, this.plugin.wikiSub('Wiki.md'), this.plugin);
+        const src = out.createDiv({ cls: 'raiz-ask-src' });
+        src.createDiv({ cls: 'raiz-muted', text: 'Páginas consultadas:' });
+        for (const f of pages) {
+          const a = src.createEl('a', { text: f.basename, cls: 'raiz-chip' });
+          a.addEventListener('click', () => (this.app.workspace.openLinkText(f.path, '', false), this.close()));
+        }
+        const save = out.createDiv({ cls: 'raiz-lib-bar' }).createEl('button', { cls: 'mod-cta', text: 'Guardar en la wiki' });
+        save.addEventListener('click', () =>
+          this.plugin.run(async () => {
+            const f = await this.plugin.saveWikiAnswer(q, answer, pages);
+            new Notice(`Guardada en la wiki: ${f.basename}`);
+            this.close();
+            this.app.workspace.getLeaf(false).openFile(f);
+          })
+        );
+      } catch (e) {
+        out.empty();
+        out.createDiv({ cls: 'raiz-error', text: `⚠️ ${e.message}` });
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    btn.addEventListener('click', go);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) go();
+    });
+    setTimeout(() => input.focus(), 50);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 // ───────────────────────────── Plugin principal ─────────────────────────────
 
 module.exports = class RaizPlugin extends Plugin {
@@ -1215,6 +1274,11 @@ module.exports = class RaizPlugin extends Plugin {
 
     this.addCommand({ id: 'open-settings', name: 'Abrir ajustes', callback: () => this.openSettings() });
     this.addCommand({ id: 'check-ollama', name: 'Comprobar la IA', callback: () => this.checkAI(true) });
+    this.addCommand({ id: 'wiki-ingest', name: 'Wiki: ingerir esta nota', callback: () => this.run(() => this.ingestToWiki()) });
+    this.addCommand({ id: 'wiki-ingest-pick', name: 'Wiki: ingerir una fuente…', callback: () => this.pickToIngest() });
+    this.addCommand({ id: 'wiki-ask', name: 'Wiki: preguntar a la wiki', callback: () => new WikiAskModal(this).open() });
+    this.addCommand({ id: 'wiki-lint', name: 'Wiki: revisar la salud', callback: () => this.run(() => this.lintWiki()) });
+    this.addCommand({ id: 'wiki-refresh', name: 'Wiki: actualizar índice y datos para agentes', callback: () => this.run(async () => (await this.writeWikiIndex(), await this.exportWikiData(), new Notice('Índice y datos de la wiki actualizados.'))) });
     this.addCommand({ id: 'ai-scan', name: 'IA: buscar mis IAs y configurarlas', callback: () => new AiScanModal(this).open() });
     this.addCommand({ id: 'pull-models', name: 'Descargar modelos de IA recomendados', callback: () => this.pullModels() });
     this.addCommand({ id: 'open-today', name: 'Abrir la nota de hoy', callback: () => this.openToday() });
@@ -1285,6 +1349,9 @@ module.exports = class RaizPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(async () => {
       this.layoutReadyAt = Date.now();
+      for (const ev of ['create', 'delete', 'rename']) this.registerEvent(this.app.vault.on(ev, (f) => this.onWikiChange(f)));
+      this.registerEvent(this.app.metadataCache.on('changed', (f) => this.onWikiChange(f)));
+      setTimeout(() => this.run(async () => (await this.writeWikiIndex(), await this.exportWikiData())), 15000);
       this.registerEvent(this.app.vault.on('create', (f) => this.onLinkedNoteCreated(f).catch((e) => console.error('[Raíz]', e))));
       if (this.aiId() !== 'ollama') this.checkAI(false);
       if (!this.settings.ai?.configured)
@@ -2798,6 +2865,7 @@ module.exports = class RaizPlugin extends Plugin {
       workout: wrap(this.workout),
       moc: wrap(this.moc),
       knowledgeHome: wrap(this.knowledgeHome),
+      wikiHome: wrap(this.wikiHome),
       inbox: wrap(this.inbox),
       tags: wrap(this.tagsPanel),
       review: wrap(this.review),
@@ -4823,6 +4891,419 @@ module.exports = class RaizPlugin extends Plugin {
     while (paras.length > 1 && (/^(PREGUNTA|NOTAS)\b/i.test(paras[0].trim()) || /^\[\d+\]/.test(paras[0].trim()) || ctxText.includes(paras[0].trim()))) paras.shift();
     const answer = paras.join('\n\n').replace(/^(Entendido|Claro|Respuesta)[,:.]\s*/i, '').trim();
     return { answer, sources };
+  }
+
+  // ═════════════════════════════ Wiki mantenida por IA (patrón "LLM Wiki") ═════════════════════════════
+  // La IA (la de Raíz o un agente externo) escribe en 13 Wiki; Raíz lleva la contabilidad mecánica
+  // (índice, registro, revisión y datos en CSV) para que nadie gaste tokens en eso.
+  wikiDir() {
+    return this.settings.folders.wiki || '13 Wiki';
+  }
+  wikiSub(name) {
+    return `${this.wikiDir()}/${name}`;
+  }
+  wikiSystemPaths() {
+    return new Set(['Índice.md', 'Registro.md', 'Revisión.md', 'Wiki.md'].map((n) => this.wikiSub(n)));
+  }
+  isWikiPage(f) {
+    return f instanceof TFile && f.extension === 'md' && f.path.startsWith(this.wikiDir() + '/') && !f.path.startsWith(this.wikiSub('Fuentes/')) && !f.path.startsWith(this.wikiSub('Datos/')) && !this.wikiSystemPaths().has(f.path);
+  }
+  wikiPages() {
+    return this.app.vault.getMarkdownFiles().filter((f) => this.isWikiPage(f));
+  }
+  wikiSources() {
+    return this.app.vault.getFiles().filter((f) => f.path.startsWith(this.wikiSub('Fuentes/')) && /^(md|pdf|txt)$/i.test(f.extension));
+  }
+  wikiClassOf(f) {
+    const c = String(this.fm(f).clase || '').toLowerCase();
+    if (c) return c;
+    const sub = f.path.slice(this.wikiDir().length + 1).split('/')[0];
+    return { Resúmenes: 'resumen', Entidades: 'entidad', Conceptos: 'concepto', Temas: 'tema', Respuestas: 'respuesta' }[sub] || 'otra';
+  }
+  wikiFindPage(name) {
+    const n = norm(name);
+    return this.wikiPages().find((f) => norm(f.basename) === n) || null;
+  }
+  /** Fuentes (por ruta) que ya tienen su resumen en la wiki. */
+  wikiIngested() {
+    const done = new Set();
+    for (const f of this.wikiPages()) {
+      if (this.wikiClassOf(f) !== 'resumen') continue;
+      for (const v of toArr(this.fm(f).fuentes)) {
+        const s = String(v).replace(/^!?\[\[|\]\]$/g, '').split('|')[0];
+        const t = this.app.metadataCache.getFirstLinkpathDest(s, f.path);
+        if (t) done.add(t.path);
+      }
+    }
+    return done;
+  }
+  async ensureWiki() {
+    for (const d of ['Fuentes', 'Resúmenes', 'Entidades', 'Conceptos', 'Temas', 'Respuestas', 'Datos']) await this.ensureFolder(this.wikiSub(d));
+  }
+  async writeIfChanged(path, text) {
+    const f = this.app.vault.getAbstractFileByPath(path);
+    if (f instanceof TFile) {
+      if ((await this.app.vault.read(f)) === text) return false;
+      await this.app.vault.modify(f, text);
+    } else {
+      await this.ensureFolder(path.split('/').slice(0, -1).join('/'));
+      await this.app.vault.create(path, text);
+    }
+    return true;
+  }
+  scheduleWiki(kind) {
+    this.wikiTimers = this.wikiTimers || {};
+    clearTimeout(this.wikiTimers[kind]);
+    this.wikiTimers[kind] = setTimeout(() => this.run(() => (kind === 'index' ? this.writeWikiIndex() : this.exportWikiData())), kind === 'index' ? 2500 : 8000);
+  }
+  onWikiChange(file) {
+    if (!file?.path || !this.app.vault.getAbstractFileByPath(this.wikiDir())) return;
+    if (file.path.startsWith(this.wikiDir() + '/') && !this.wikiSystemPaths().has(file.path) && !file.path.startsWith(this.wikiSub('Datos/'))) this.scheduleWiki('index');
+    if (file instanceof TFile && this.levelOf(file) === 'daily') this.scheduleWiki('data');
+  }
+  /** Índice.md: catálogo de la wiki con el resumen de cada página. Lo primero que lee un agente. */
+  async writeWikiIndex() {
+    if (!this.app.vault.getAbstractFileByPath(this.wikiDir())) return;
+    const pages = this.wikiPages().sort((a, b) => a.basename.localeCompare(b.basename, 'es'));
+    const groups = [
+      ['tema', 'Temas'],
+      ['concepto', 'Conceptos'],
+      ['entidad', 'Entidades'],
+      ['resumen', 'Resúmenes'],
+      ['respuesta', 'Respuestas'],
+      ['otra', 'Otras'],
+    ];
+    const L = ['---', 'cssclasses:', '  - raiz-panel', 'tipo: wiki-sistema', '---', '# Índice de la wiki', `Catálogo de las ${pages.length} páginas con su resumen. **Lo genera Raíz solo**, no lo edites a mano. Un agente lo lee primero para saber qué abrir.`, ''];
+    if (!pages.length) L.push('_Todavía no hay páginas. Ingiere tu primera fuente con **Wiki: ingerir esta nota**._', '');
+    const groupOf = (f) => {
+      const c = this.wikiClassOf(f);
+      return groups.some((g) => g[0] === c) ? c : 'otra';
+    };
+    for (const [cls, title] of groups) {
+      const items = pages.filter((f) => groupOf(f) === cls);
+      if (!items.length) continue;
+      L.push(`## ${title} (${items.length})`);
+      for (const f of items) {
+        const fm = this.fm(f);
+        const n = toArr(fm.fuentes).length;
+        L.push(`- [[${f.basename}]] — ${String(fm.resumen || '').replace(/\s+/g, ' ').trim() || '(sin resumen)'}${n ? ` · ${n} fuente${n > 1 ? 's' : ''}` : ''}`);
+      }
+      L.push('');
+    }
+    const src = this.wikiSources();
+    if (src.length) {
+      const done = this.wikiIngested();
+      L.push(`## Fuentes (${src.length})`);
+      for (const f of src.sort((a, b) => a.basename.localeCompare(b.basename, 'es'))) L.push(`- [[${f.extension === 'md' ? f.basename : f.name}]] — ${done.has(f.path) ? 'ingerida' : 'pendiente'}`);
+      L.push('');
+    }
+    return this.writeIfChanged(this.wikiSub('Índice.md'), L.join('\n'));
+  }
+  /** Datos/diario.csv: una fila por día con lo medible (para agentes: una lectura en vez de cientos de notas). */
+  async exportWikiData() {
+    if (!this.app.vault.getAbstractFileByPath(this.wikiDir())) return;
+    const days = this.dailiesIn(moment('2000-01-01'), moment().endOf('day'));
+    const goals = this.activeGoals();
+    const habits = this.settings.habits || [];
+    const base = [
+      ['fecha', 'Fecha (AAAA-MM-DD)'],
+      ['valoracion', 'Valoración del día, 1 a 10'],
+      ['titulo', 'Título que se le puso al día'],
+      ['animo', 'Ánimo, 1 a 5'],
+      ['energia', 'Energía, 1 a 5'],
+      ['entreno', 'Tipo de entrenamiento'],
+      ['duracion', 'Duración del entrenamiento, minutos'],
+      ['rpe', 'Esfuerzo percibido, 1 a 10'],
+    ];
+    const cols = base.concat(goals.map((g) => [g.key, `${g.label}${g.unit ? ` (${g.unit})` : ''}${g.goal ? `, objetivo ${g.goal}` : ''}`]), habits.map((h) => [`habito_${h.key}`, `Hábito "${h.label.replace(/^\S+\s/, '')}": 1 = cumplido`]));
+    const esc = (v) => {
+      if (v === null || v === undefined) return '';
+      const s = String(v).replace(/\r?\n/g, ' ');
+      return /[",;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [cols.map((c) => c[0]).join(',')];
+    for (const d of days) {
+      const fm = d.fm;
+      const val = (k) => {
+        if (k === 'fecha') return isoDate(d.date);
+        if (k === 'titulo') return fm.alias || '';
+        if (k.startsWith('habito_')) return fm.habitos?.[k.slice(7)] === true ? 1 : fm.habitos ? 0 : '';
+        const v = fm[k];
+        return Array.isArray(v) ? v.join(' ') : v ?? '';
+      };
+      rows.push(cols.map((c) => esc(val(c[0]))).join(','));
+    }
+    await this.writeIfChanged(this.wikiSub('Datos/diario.csv'), rows.join('\n') + '\n');
+    await this.writeIfChanged(
+      this.wikiSub('Datos/columnas.md'),
+      ['# Columnas de diario.csv', 'Lo genera Raíz a partir de las notas diarias. Una fila por día; vacío = no se registró.', '', ...cols.map(([k, d]) => `- \`${k}\`: ${d}`), ''].join('\n')
+    );
+  }
+  async logWiki(tipo, titulo, paginas = []) {
+    const path = this.wikiSub('Registro.md');
+    const entry = `\n## [${isoDate(moment())}] ${tipo} | ${titulo}\n${paginas.length ? `Páginas: ${paginas.map((p) => `[[${p}]]`).join(', ')}\n` : ''}`;
+    const f = this.app.vault.getAbstractFileByPath(path);
+    if (f instanceof TFile) await this.app.vault.process(f, (d) => d.replace(/\s*$/, '\n') + entry);
+    else await this.writeIfChanged(path, `# Registro de la wiki\n${entry}`);
+  }
+  wikiFm(clase, resumen, fuentes) {
+    return ['---', 'tipo: wiki', `clase: ${clase}`, `resumen: ${JSON.stringify(String(resumen || '').replace(/\s+/g, ' ').trim())}`, 'fuentes:', ...fuentes.map((s) => `  - ${JSON.stringify(`[[${s}]]`)}`), `actualizado: ${isoDate(moment())}`, 'tags:', '  - wiki', '---'].join('\n');
+  }
+  /** Agrega una mención a una entidad o concepto (o lo crea) sin tocar lo que ya tenía. */
+  async wikiMention(name, clase, resumenPage, dato, sourceName) {
+    const clean = safeName(name).slice(0, 80);
+    if (!clean) return null;
+    const line = `- [[${resumenPage}]]: ${String(dato || '').trim()}`;
+    let f = this.wikiFindPage(clean);
+    if (f) {
+      await this.app.vault.process(f, (d) => {
+        if (d.includes(`[[${resumenPage}]]`)) return d;
+        return /\n## Menciones\s*\n/.test(d) ? d.replace(/(\n## Menciones\s*\n(?:- .*\n?)*)/, (m) => m.replace(/\n?$/, '\n') + line + '\n') : d.replace(/\s*$/, '\n\n## Menciones\n') + line + '\n';
+      });
+      await this.app.fileManager.processFrontMatter(f, (fm) => {
+        const list = toArr(fm.fuentes).map(String);
+        const link = `[[${sourceName}]]`;
+        if (!list.includes(link)) fm.fuentes = list.concat(link);
+        fm.actualizado = isoDate(moment());
+        if (!fm.resumen && dato) fm.resumen = dato;
+      });
+      return f.basename;
+    }
+    const dir = this.wikiSub(clase === 'entidad' ? 'Entidades' : 'Conceptos');
+    f = await this.createNote(dir, clean, `${this.wikiFm(clase, dato, [sourceName])}\n# ${clean}\n\n${dato} ([[${resumenPage}]])\n\n## Menciones\n${line}\n`, false);
+    return f.basename;
+  }
+  wikiCharBudget() {
+    return this.aiId() === 'ollama' ? Math.max(4000, Math.round(this.settings.numCtx * 1.1)) : 24000;
+  }
+  /** Ingerir: la IA lee una fuente, escribe su resumen y actualiza entidades y conceptos de la wiki. */
+  async ingestToWiki(file) {
+    file = file || this.activeFile();
+    if (this.isWikiPage(file) || this.wikiSystemPaths().has(file.path)) throw new Error('Esa nota ya es parte de la wiki. Abre una fuente: un artículo de Fuentes, un libro, un apunte…');
+    if (file.extension !== 'md') throw new Error('Por ahora la IA de Raíz lee notas .md. Para un PDF, pídeselo a tu agente o conviértelo a texto.');
+    await this.ensureWiki();
+    const text = (await this.noteText(file)).slice(0, this.wikiCharBudget());
+    if (!this.hasContent(text)) throw new Error('La nota está casi vacía: no hay nada que ingerir.');
+    const known = this.wikiPages()
+      .filter((f) => ['entidad', 'concepto', 'tema'].includes(this.wikiClassOf(f)))
+      .map((f) => f.basename)
+      .slice(0, 300);
+    const item = { type: 'object', properties: { nombre: { type: 'string' }, dato: { type: 'string' } }, required: ['nombre', 'dato'] };
+    const schema = {
+      type: 'object',
+      properties: {
+        titulo: { type: 'string' },
+        resumen: { type: 'string' },
+        ideas: { type: 'array', items: { type: 'string' } },
+        entidades: { type: 'array', items: item },
+        conceptos: { type: 'array', items: item },
+        temas: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['titulo', 'resumen', 'ideas', 'entidades', 'conceptos'],
+    };
+    const r = await this.chat({
+      tier: 'deep',
+      temperature: 0.2,
+      maxTokens: 1500,
+      schema,
+      label: 'Ingiriendo en la wiki',
+      system: `${this.systemPrompt()}\nMantienes una wiki personal. Extraes lo importante de una fuente con tus propias palabras, sin inventar nada que no esté en ella.`,
+      prompt:
+        `Analiza la fuente y devuelve:\n- titulo: título corto de la fuente.\n- resumen: una sola frase.\n- ideas: de 3 a 8 ideas clave, cada una una frase con datos concretos.\n- entidades: hasta 8 personas, lugares, herramientas, lenguajes, obras o empresas; "dato" = lo que dice la fuente sobre ella, en una frase.\n- conceptos: hasta 8 ideas, técnicas o teorías, con su "dato".\n- temas: hasta 3 temas amplios a los que pertenece.\n` +
+        (known.length ? `Si algo ya existe en la wiki, usa EXACTAMENTE ese nombre: ${known.join(' · ')}\n` : '') +
+        `\nFUENTE: ${file.basename}\n${text}`,
+    });
+    const titulo = safeName(r.titulo || file.basename).slice(0, 90) || file.basename;
+    const pageName = `Resumen - ${titulo}`;
+    // Reingerir la misma fuente reemplaza su resumen anterior
+    const old = this.wikiPages().find((f) => this.wikiClassOf(f) === 'resumen' && toArr(this.fm(f).fuentes).some((v) => String(v).includes(`[[${file.basename}]]`)));
+    const touched = [];
+    const ents = (r.entidades || []).filter((e) => e?.nombre).slice(0, 8);
+    const cons = (r.conceptos || []).filter((e) => e?.nombre).slice(0, 8);
+    const temas = (r.temas || []).map((t) => safeName(t)).filter(Boolean).slice(0, 3);
+    const finalName = old ? old.basename : pageName;
+    const body = [
+      this.wikiFm('resumen', r.resumen, [file.basename]),
+      `# ${titulo}`,
+      `> Fuente: [[${file.basename}]]`,
+      '',
+      String(r.resumen || '').trim(),
+      '',
+      '## Ideas clave',
+      ...(r.ideas || []).slice(0, 8).map((i) => `- ${String(i).trim()}`),
+      '',
+      '## Conecta con',
+      ents.length ? `- Entidades: ${ents.map((e) => `[[${safeName(e.nombre)}]]`).join(', ')}` : '',
+      cons.length ? `- Conceptos: ${cons.map((e) => `[[${safeName(e.nombre)}]]`).join(', ')}` : '',
+      temas.length ? `- Temas: ${temas.map((t) => `[[${t}]]`).join(', ')}` : '',
+      '',
+    ]
+      .filter((l, i, a) => l !== '' || a[i - 1] !== '')
+      .join('\n');
+    let page;
+    if (old) {
+      await this.app.vault.modify(old, body);
+      page = old;
+    } else page = await this.createNote(this.wikiSub('Resúmenes'), finalName, body, false);
+    touched.push(page.basename);
+    for (const e of ents) touched.push(await this.wikiMention(e.nombre, 'entidad', page.basename, e.dato, file.basename));
+    for (const c of cons) touched.push(await this.wikiMention(c.nombre, 'concepto', page.basename, c.dato, file.basename));
+    for (const t of temas) {
+      const tf = this.wikiFindPage(t);
+      if (tf) touched.push(await this.wikiMention(t, 'tema', page.basename, r.resumen, file.basename));
+    }
+    const list = [...new Set(touched.filter(Boolean))];
+    await this.logWiki('ingesta', titulo, list);
+    await this.writeWikiIndex();
+    new Notice(`✅ Ingerida en la wiki: ${list.length} página(s) creadas o actualizadas.`, 7000);
+    await this.app.workspace.getLeaf(false).openFile(page);
+    return page;
+  }
+  /** Preguntar a la wiki: elige las páginas por el índice y responde citándolas. */
+  async askWiki(question) {
+    const pages = this.wikiPages();
+    if (!pages.length) throw new Error('La wiki está vacía. Ingiere una fuente primero.');
+    const stop = new Set('el la los las un una unos unas de del al a y o u en con por para que qué como cómo cual cuál es son fue ser se mi mis tu tus me te lo le les su sus sobre entre más menos muy ya no si sí cuando donde dónde quien quién'.split(' '));
+    const words = norm(question).split(/[^a-z0-9ñ]+/).filter((w) => w.length > 2 && !stop.has(w));
+    const scored = pages
+      .map((f) => {
+        const name = norm(f.basename);
+        const res = norm(this.fm(f).resumen || '');
+        let s = 0;
+        for (const w of words) s += (name.includes(w) ? 3 : 0) + (res.includes(w) ? 2 : 0);
+        if (this.wikiClassOf(f) === 'tema') s *= 1.3; // las síntesis responden mejor
+        return { f, s };
+      })
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 6);
+    if (!scored.length) throw new Error('No encontré páginas de la wiki sobre eso. Prueba con otras palabras o ingiere una fuente del tema.');
+    const per = Math.floor(this.wikiCharBudget() / scored.length);
+    const ctx = [];
+    for (const { f } of scored) ctx.push(`### ${f.basename}\n${(await this.noteText(f)).slice(0, per)}`);
+    const answer = await this.chat({
+      tier: 'deep',
+      temperature: 0.2,
+      label: 'Consultando la wiki',
+      system: `${this.systemPrompt()}\nResponde usando SOLO estas páginas de la wiki y cítalas con su nombre entre corchetes dobles, como [[Nombre]]. Si algo no está en ellas, dilo.\n\n${ctx.join('\n\n')}`,
+      prompt: question,
+    });
+    return { answer: answer.trim(), pages: scored.map((x) => x.f) };
+  }
+  async saveWikiAnswer(question, answer, pages) {
+    await this.ensureWiki();
+    const name = safeName(question.replace(/[¿?]/g, '')).slice(0, 80) || 'Respuesta';
+    const first = answer.replace(/\[\[|\]\]/g, '').split(/(?<=[.!?])\s/)[0].slice(0, 160);
+    const f = await this.createNote(this.wikiSub('Respuestas'), name, `${this.wikiFm('respuesta', first, pages.map((p) => p.basename))}\n# ${question.trim()}\n\n${answer}\n\n## Páginas consultadas\n${pages.map((p) => `- [[${p.basename}]]`).join('\n')}\n`, false);
+    await this.logWiki('consulta', question.trim().slice(0, 100), [f.basename]);
+    await this.writeWikiIndex();
+    return f;
+  }
+  /** Revisión sin IA: lo mecánico se calcula gratis y queda listo para que tú o tu agente lo arreglen. */
+  async lintWiki() {
+    await this.ensureWiki();
+    const pages = this.wikiPages();
+    const sys = this.wikiSystemPaths();
+    const inbound = new Map(pages.map((f) => [f.path, 0]));
+    for (const [from, links] of Object.entries(this.app.metadataCache.resolvedLinks)) {
+      if (sys.has(from)) continue;
+      for (const to of Object.keys(links)) if (inbound.has(to) && to !== from) inbound.set(to, inbound.get(to) + 1);
+    }
+    const orphans = pages.filter((f) => inbound.get(f.path) === 0);
+    const noSummary = pages.filter((f) => !String(this.fm(f).resumen || '').trim());
+    const broken = new Map();
+    for (const f of pages) for (const t of Object.keys(this.app.metadataCache.unresolvedLinks[f.path] || {})) broken.set(t, (broken.get(t) || []).concat(f.basename));
+    const missing = [...broken.entries()].filter(([, from]) => from.length >= 2).sort((a, b) => b[1].length - a[1].length);
+    const done = this.wikiIngested();
+    const pending = this.wikiSources().filter((f) => !done.has(f.path));
+    const stale = [];
+    for (const f of pages) {
+      if (this.wikiClassOf(f) !== 'resumen') continue;
+      for (const v of toArr(this.fm(f).fuentes)) {
+        const t = this.app.metadataCache.getFirstLinkpathDest(String(v).replace(/^!?\[\[|\]\]$/g, '').split('|')[0], f.path);
+        if (t && t.stat.mtime > f.stat.mtime + 60000) stale.push([f, t]);
+      }
+    }
+    const sec = (title, items, fmt, hint) => [`## ${title} (${items.length})`, items.length ? (hint ? `_${hint}_\n` : '') + items.slice(0, 60).map(fmt).join('\n') : '- Nada por aquí. ✓', ''];
+    const total = orphans.length + noSummary.length + broken.size + pending.length + stale.length;
+    const out = [
+      '---',
+      'cssclasses:',
+      '  - raiz-panel',
+      'tipo: wiki-sistema',
+      '---',
+      '# Revisión de la wiki',
+      `Generada el ${fechaLarga(moment())} con **Wiki: revisar la salud**. ${total ? `Hay ${total} cosa(s) por revisar.` : 'Todo en orden.'} Pídele a tu agente: "arregla lo de Revisión.md". También puede buscar contradicciones y datos que quedaron viejos.`,
+      '',
+      ...sec('Conceptos que se mencionan y no tienen página', missing, ([t, from]) => `- [[${t}]] — en ${from.length} páginas`, 'Candidatos a página propia.'),
+      ...sec('Fuentes sin ingerir', pending, (f) => `- [[${f.extension === 'md' ? f.basename : f.name}]]`),
+      ...sec('Resúmenes desactualizados', stale, ([f, t]) => `- [[${f.basename}]] — su fuente [[${t.basename}]] cambió después`, 'Vuelve a ingerir la fuente.'),
+      ...sec('Páginas huérfanas', orphans, (f) => `- [[${f.basename}]]`, 'Ninguna otra nota las enlaza.'),
+      ...sec('Páginas sin resumen', noSummary, (f) => `- [[${f.basename}]]`, 'Sin "resumen" no aparecen bien en el Índice.'),
+      ...sec('Enlaces rotos', [...broken.entries()].filter(([, from]) => from.length < 2), ([t, from]) => `- [[${t}]] — en [[${from[0]}]]`),
+    ];
+    const path = this.wikiSub('Revisión.md');
+    await this.writeIfChanged(path, out.join('\n'));
+    await this.logWiki('revisión', total ? `${total} pendiente(s)` : 'todo en orden');
+    new Notice(total ? `Revisión lista: ${total} cosa(s) por revisar.` : '✅ La wiki está en orden.');
+    await this.app.workspace.getLeaf(false).openFile(this.app.vault.getAbstractFileByPath(path));
+  }
+  pickToIngest() {
+    const done = this.wikiIngested();
+    const files = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => this.isContentFile(f) && !this.isWikiPage(f) && !this.wikiSystemPaths().has(f.path) && !this.levelOf(f) && !this.isPanel(f) && !done.has(f.path))
+      .sort((a, b) => (b.path.startsWith(this.wikiSub('Fuentes/')) ? 1 : 0) - (a.path.startsWith(this.wikiSub('Fuentes/')) ? 1 : 0) || b.stat.mtime - a.stat.mtime);
+    new FilePicker(this.app, files, 'Elige la fuente a ingerir en la wiki…', (f) => this.run(() => this.ingestToWiki(f))).open();
+  }
+  /** Panel de la wiki: cuántas páginas hay, lo último que pasó y los botones. */
+  async wikiHome(dv, container) {
+    const pages = this.wikiPages();
+    const count = (c) => pages.filter((f) => this.wikiClassOf(f) === c).length;
+    const done = this.wikiIngested();
+    const pending = this.wikiSources().filter((f) => !done.has(f.path)).length;
+    this.kpis(container, [
+      ['Páginas', pages.length, `${count('tema')} temas · ${count('concepto')} conceptos · ${count('entidad')} entidades`],
+      ['Resúmenes', count('resumen'), 'una por fuente'],
+      ['Fuentes pendientes', pending, pending ? 'por ingerir' : 'todo ingerido'],
+      ['Respuestas', count('respuesta'), 'guardadas'],
+    ]);
+    const bar = container.createDiv({ cls: 'raiz-lib-bar' });
+    const btn = (icon, text, fn, cta) => {
+      const b = bar.createEl('button', { cls: cta ? 'mod-cta' : '' });
+      setIcon(b.createSpan({ cls: 'raiz-btn-ic' }), icon);
+      b.createSpan({ text });
+      b.addEventListener('click', () => this.run(fn));
+    };
+    btn('file-input', 'Ingerir una fuente', () => this.pickToIngest(), true);
+    btn('message-circle-question', 'Preguntar a la wiki', () => new WikiAskModal(this).open());
+    btn('stethoscope', 'Revisar la salud', () => this.lintWiki());
+    btn('list', 'Índice', async () => (await this.writeWikiIndex(), this.app.workspace.openLinkText(this.wikiSub('Índice.md'), '', false)));
+    // Lo último del registro
+    const reg = this.app.vault.getAbstractFileByPath(this.wikiSub('Registro.md'));
+    if (reg instanceof TFile) {
+      const last = (await this.app.vault.cachedRead(reg)).split('\n').filter((l) => /^## \[/.test(l)).slice(-6).reverse();
+      if (last.length) {
+        this.heading(container, 'Lo último');
+        const ul = container.createEl('ul', { cls: 'raiz-wiki-log' });
+        for (const l of last) {
+          const m = l.match(/^## \[([^\]]+)\]\s*([^|]+)\|\s*(.*)$/);
+          const li = ul.createEl('li');
+          if (!m) {
+            li.setText(l.slice(3));
+            continue;
+          }
+          li.createSpan({ cls: 'raiz-pill', text: m[2].trim() });
+          li.createSpan({ text: ` ${m[3].trim()} ` });
+          li.createSpan({ cls: 'raiz-muted', text: fechaCorta(moment(m[1])) });
+        }
+      }
+    }
+    const recent = pages.sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 8);
+    if (recent.length) {
+      this.heading(container, 'Actualizadas hace poco');
+      this.table(container, ['Página', 'Tipo', 'Resumen'], recent.map((f) => [(td) => this.link(td, f, f.basename), this.wikiClassOf(f), String(this.fm(f).resumen || '—')]));
+    }
   }
 
   // ═════════════════════════════ Bandeja de entrada ═════════════════════════════

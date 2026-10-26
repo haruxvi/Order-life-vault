@@ -121,6 +121,10 @@
     "12 Conocimiento/Repaso.md": {
       "icon": "lucide-layers",
       "color": "#22d3ee"
+    },
+    "13 Wiki": {
+      "icon": "lucide-library-big",
+      "color": "#c084fc"
     }
   },
   "bookmarkIcons": {},

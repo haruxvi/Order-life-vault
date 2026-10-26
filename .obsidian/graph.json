@@ -1,10 +1,10 @@
 {
   "collapse-filter": false,
   "search": "-path:\"06 Plantillas\" -path:\"00 Dashboard\" -path:\"07 Notes/Extras\"  -path:\"00 Bandeja\"",
-  "showTags": false,
-  "showAttachments": false,
+  "showTags": true,
+  "showAttachments": true,
   "hideUnresolved": true,
-  "showOrphans": false,
+  "showOrphans": true,
   "collapse-color-groups": false,
   "colorGroups": [
     {
@@ -44,7 +44,7 @@
     }
   ],
   "collapse-display": false,
-  "showArrow": false,
+  "showArrow": true,
   "textFadeMultiplier": 0,
   "nodeSizeMultiplier": 1,
   "lineSizeMultiplier": 1,
@@ -53,6 +53,6 @@
   "repelStrength": 20,
   "linkStrength": 1,
   "linkDistance": 473,
-  "scale": 0.3028395783414193,
+  "scale": 0.6368840912963908,
   "close": true
 }

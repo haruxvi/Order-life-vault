@@ -193,6 +193,27 @@ Basado en la idea de *enlazar en vez de archivar*:
 - **Modo certamen**: si una asignatura tiene una evaluación en los próximos 21 días, aparece este modo para practicar todas sus tarjetas.
 - Tu nota del día te avisa cuántas tarjetas tocan hoy.
 
+## Wiki: tu conocimiento, mantenido por la IA
+En [[Wiki]] (`13 Wiki`) la IA arma una base de conocimiento a partir de lo que lees, estudias y vives. La idea viene del patrón *LLM Wiki*: la IA lee cada fuente **una vez**, extrae lo importante y lo integra en páginas enlazadas. Después responde leyendo esas páginas, sin tener que volver a procesar todo cada vez.
+
+La división es simple:
+- **`12 Conocimiento` lo escribes tú.**
+- **`13 Wiki` lo mantiene la IA.** Puede leer todas tus notas, pero solo escribe en su carpeta.
+
+**Usarla desde Obsidian** (con la IA de Raíz):
+- **Wiki: ingerir esta nota** o **Ingerir una fuente**. Sirve un artículo guardado en `Fuentes/`, un libro de la Biblioteca, un apunte o una captura. La IA escribe el resumen y crea o actualiza las entidades y los conceptos.
+- **Wiki: preguntar a la wiki** responde citando las páginas. Con **Guardar en la wiki**, la respuesta queda como página nueva.
+- **Wiki: revisar la salud** genera `Revisión.md` sin gastar IA: conceptos sin página, fuentes sin ingerir, resúmenes desactualizados, huérfanas y enlaces rotos.
+
+**Usarla con un agente** (Codex, OpenCode, Gemini CLI, Hermes, Claude Code…):
+- Abre el agente en la carpeta del vault. Sus reglas están en `AGENTS.md`. Si tu agente no lo lee solo, dile al empezar: "sigue las reglas de AGENTS.md". En Claude Code, crea un `CLAUDE.md` con la línea `@AGENTS.md`; ese archivo no se sube a GitHub.
+- **Para ahorrar tokens, Raíz hace por el agente el trabajo mecánico:**
+  - Mantiene el **Índice** al día, con el resumen de cada página.
+  - Exporta tus datos diarios a `Datos/diario.csv`, así el agente lee una tabla en vez de cientos de notas.
+  - El archivo `.ignore` evita que el agente lea configuraciones, plantillas e imágenes.
+
+**Privacidad:** `Fuentes/` y `Datos/` no se suben a GitHub. Las páginas de la wiki **sí** se suben, igual que tus notas. Si la usas para temas personales y tu repositorio es público, tenlo en cuenta.
+
 ## 5. Crear cosas
 `Ctrl+P` y escribe **Raíz**:
 - **Nueva asignatura**: nombre, código, semestre, horario (`Lun 08:15-09:45 | Sala A-12`, uno por línea). Después llena las evaluaciones con `[pond:: 30] [fecha:: 2026-10-20] [nota:: 5,5]`.

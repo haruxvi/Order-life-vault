@@ -235,6 +235,7 @@ a.tag, .cm-hashtag {
 .nav-folder-title[data-path^="10 "] { color: #fb923c; }
 .nav-folder-title[data-path^="11 "] { color: #f472b6; }
 .nav-folder-title[data-path^="12 "] { color: #22d3ee; }
+.nav-folder-title[data-path^="13 "] { color: #c084fc; }
 .theme-light .nav-folder-title[data-path] { filter: brightness(0.7) saturate(1.2); }
 .nav-file-title.is-active { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent) !important; }
 .nav-folder.mod-root > .nav-folder-children > .nav-folder > .nav-folder-children { border-left: 1px dashed var(--background-modifier-border); margin-left: 0.6em; }

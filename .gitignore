@@ -22,3 +22,8 @@
 
 # Fuentes que agregas desde tu PC (pueden tener licencia propia)
 .obsidian/plugins/raiz/fuentes/
+
+# Wiki: las fuentes en crudo son de terceros y los datos se generan solos
+13 Wiki/Fuentes/*
+!13 Wiki/Fuentes/.gitkeep
+13 Wiki/Datos/

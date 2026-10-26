@@ -19,6 +19,7 @@ Un vault de Obsidian para ordenar la vida personal, académica y de entrenamient
 | **Estudio estilo Notion** | Páginas con portada, ícono, propiedades y subpáginas, y bases con vistas (tabla, tarjetas, lista). Dentro de cualquier nota puedes insertar páginas enlazadas, bases, tarjetas o cualquier módulo. Puedes escribir a mano o con IA. |
 | **Biblioteca** | Juegos, libros, anime, manga, películas, series, videos y cursos, con portadas automáticas, filtros y un tablero por estado. |
 | **Conocimiento** | Mapas de contenido, menciones sin enlazar, notas relacionadas con IA, preguntas a todo el vault y repaso espaciado. |
+| **Wiki para IA y agentes** | Una base de conocimiento que mantiene la IA (patrón *LLM Wiki*): resúmenes, entidades, conceptos y temas enlazados. Trae reglas listas para agentes en `AGENTS.md`, y Raíz mantiene solo el índice, el registro y los datos para que el agente gaste menos tokens. |
 | **Bandeja, agenda y etiquetas** | Captura rápida, eventos y reuniones, tareas con fecha y etiquetas organizadas. |
 | **Personalización** | Imagen de fondo por nota o por apartado (también desde tu PC), tipografía para el texto, los títulos y la interfaz, y el tema "bosque nocturno". |
 
@@ -59,10 +60,11 @@ En el iPhone o Android todo funciona menos la IA local: usa un proveedor con API
 | `09 Entrenamiento` | Rutinas y panel de entrenamiento |
 | `10 Agenda` | Eventos y reuniones |
 | `11 Biblioteca` | Juegos, libros, anime, manga, películas, series, videos y cursos |
-| `12 Conocimiento` | Notas, mapas de contenido, etiquetas y repaso |
+| `12 Conocimiento` | Notas, mapas de contenido, etiquetas y repaso (las escribes tú) |
+| `13 Wiki` | Wiki mantenida por la IA: índice, registro, fuentes, resúmenes, entidades, conceptos, temas y respuestas |
 
 ### Qué no se sube a este repositorio
-Tus API keys, tus imágenes de `06 Plantillas/Portadas`, las portadas descargadas de la biblioteca, tus fuentes propias, el índice de la IA (`vectores.json`) y el estado de tu espacio de trabajo.
+Tus API keys, las fuentes de `13 Wiki/Fuentes` y los datos de `13 Wiki/Datos`, tus imágenes de `06 Plantillas/Portadas`, las portadas descargadas de la biblioteca, tus fuentes propias, el índice de la IA (`vectores.json`) y el estado de tu espacio de trabajo.
 
 ### Aviso sobre software de terceros
 Los plugins de la comunidad que vienen en `.obsidian/plugins` **no son de mi autoría**. Pertenecen a sus autores y se incluyen sin modificaciones, cada uno con su licencia original. Los servicios y programas de IA externos se rigen por sus propios términos. El detalle está en **[TERCEROS.md](TERCEROS.md)**.
@@ -84,6 +86,7 @@ An Obsidian vault for organizing personal, academic and training life, with the 
 | **Notion-style study** | Pages with a cover, an icon, properties and subpages, plus databases with views (table, cards, list). Inside any note you can insert linked pages, databases, page cards or any module. Write by hand or with AI. |
 | **Library** | Games, books, anime, manga, movies, series, videos and courses, with automatic covers, filters and a status board. |
 | **Knowledge** | Maps of content, unlinked mentions, AI-related notes, questions over the whole vault and spaced repetition. |
+| **Wiki for AI and agents** | A knowledge base maintained by the AI (the *LLM Wiki* pattern): linked summaries, entities, concepts and topics. It comes with ready-made rules for agents in `AGENTS.md`, and Raíz keeps the index, log and data up to date by itself so the agent spends fewer tokens. |
 | **Inbox, agenda and tags** | Quick capture, events and meetings, dated tasks and organized tags. |
 | **Customization** | A background image per note or per section (including images from your PC), typography for body text, headings and the interface, and the "night forest" theme. |
 
@@ -124,10 +127,11 @@ On iPhone or Android everything works except local AI: use an API provider, or y
 | `09 Entrenamiento` | Routines and training dashboard |
 | `10 Agenda` | Events and meetings |
 | `11 Biblioteca` | Games, books, anime, manga, movies, series, videos and courses |
-| `12 Conocimiento` | Notes, maps of content, tags and review |
+| `12 Conocimiento` | Notes, maps of content, tags and review (written by you) |
+| `13 Wiki` | AI-maintained wiki: index, log, sources, summaries, entities, concepts, topics and answers |
 
 ### What is not in this repository
-Your API keys, your images in `06 Plantillas/Portadas`, library covers downloaded from external services, your own font files, the AI index (`vectores.json`) and your workspace state.
+Your API keys, the sources in `13 Wiki/Fuentes` and the data in `13 Wiki/Datos`, your images in `06 Plantillas/Portadas`, library covers downloaded from external services, your own font files, the AI index (`vectores.json`) and your workspace state.
 
 ### Third-party software notice
 The community plugins bundled in `.obsidian/plugins` were **not written by me**. They belong to their respective authors and are included unmodified, each under its original license. External AI services and programs are governed by their own terms. Details are in **[THIRD_PARTY.md](THIRD_PARTY.md)**.

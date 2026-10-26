@@ -1,0 +1,14 @@
+# Lo que los agentes de IA no necesitan leer (ripgrep y la mayoría de los agentes respetan este archivo).
+# Ahorra tokens: son configuraciones, plantillas, imágenes y datos generados.
+.obsidian/
+.trash/
+.anchor/
+06 Plantillas/
+11 Biblioteca/_portadas/
+07 Adjuntos/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.svg
