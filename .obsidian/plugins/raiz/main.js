@@ -5166,7 +5166,7 @@ module.exports = class RaizPlugin extends Plugin {
     return fm.privado === true || /^(true|sí|si)$/i.test(String(fm.privado || '')) || toArr(fm.tags).map((t) => String(t).toLowerCase()).includes('privado');
   }
   wikiFm(clase, resumen, fuentes) {
-    return ['---', 'tipo: wiki', `clase: ${clase}`, `resumen: ${JSON.stringify(String(resumen || '').replace(/\s+/g, ' ').trim())}`, 'fuentes:', ...fuentes.map((s) => `  - ${JSON.stringify(`[[${s}]]`)}`), `actualizado: ${isoDate(moment())}`, 'revisado: false', 'tags:', '  - wiki', '---'].join('\n');
+    return ['---', 'tipo: wiki', `clase: ${clase}`, `resumen: ${JSON.stringify(String(resumen || '').replace(/\s+/g, ' ').trim())}`, 'fuentes:', ...fuentes.map((s) => `  - ${JSON.stringify(`[[${s}]]`)}`), `actualizado: ${isoDate(moment())}`, 'revisado: false', ...(clase === 'respuesta' ? ['resultado: ""'] : []), 'tags:', '  - wiki', '---'].join('\n');
   }
   /** Agrega una mención a una entidad o concepto (o lo crea) sin tocar lo que ya tenía. */
   async wikiMention(name, clase, resumenPage, dato, sourceName) {

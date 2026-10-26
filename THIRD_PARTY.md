@@ -41,7 +41,7 @@ These plugins are used by the vault but are **not redistributed**, because their
 
 ## My own work
 I wrote these myself:
-- The **Raíz** plugin (`.obsidian/plugins/raiz`), including the agent tool `boveda.js`, which adapts ideas from my project [Lymi](https://github.com/haruxvi/Lymi).
+- The **Raíz** plugin (`.obsidian/plugins/raiz`), including the agent tool `boveda.js`, which adapts ideas from my project [Lymi](https://github.com/haruxvi/Lymi) and, rewritten from scratch without copying code, from [graphify](https://github.com/Graphify-Labs/graphify), [memU](https://github.com/NevaMind-AI/memU) and [Serena](https://github.com/oraios/serena).
 - The theme `.obsidian/snippets/raiz-theme.css`.
 - The code-generated SVG banners in `06 Plantillas/Banners`.
 - The templates in `06 Plantillas`, and the vault's notes and dashboards.

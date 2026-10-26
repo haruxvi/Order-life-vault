@@ -20,7 +20,7 @@ Un vault de Obsidian para ordenar la vida personal, académica y de entrenamient
 | **Biblioteca** | Juegos, libros, anime, manga, películas, series, videos y cursos, con portadas automáticas, filtros y un tablero por estado. |
 | **Conocimiento** | Mapas de contenido, menciones sin enlazar, notas relacionadas con IA, preguntas a todo el vault y repaso espaciado. |
 | **Wiki para IA y agentes** | Una base de conocimiento que mantiene la IA (patrón *LLM Wiki*): resúmenes, entidades, conceptos y temas enlazados. Trae reglas listas para agentes en `AGENTS.md`, y Raíz mantiene solo el índice, el registro y los datos. |
-| **Ahorro de tokens que escala** | `boveda`, una herramienta para agentes (CLI y servidor MCP) que busca y lee por secciones: ~630 tokens por búsqueda con 100 notas y con 20.000. Mide su ahorro y el consumo de la IA de Raíz, y nunca deja salir las notas privadas. |
+| **Ahorro de tokens que escala** | `boveda`, una herramienta para agentes (CLI y servidor MCP). Busca por palabras y por significado, lee y escribe por secciones, recorre el grafo y recuerda lecciones entre sesiones: ~630 tokens por búsqueda con 100 notas y con 20.000. Mide su ahorro y nunca deja salir las notas privadas. |
 | **Bandeja, agenda y etiquetas** | Captura rápida, eventos y reuniones, tareas con fecha y etiquetas organizadas. |
 | **Personalización** | Imagen de fondo por nota o por apartado (también desde tu PC), tipografía para el texto, los títulos y la interfaz, y el tema "bosque nocturno". |
 
@@ -58,6 +58,12 @@ Las ideas vienen de [Lymi](https://github.com/haruxvi/Lymi), otro proyecto mío:
 - El ahorro se mide, no se promete.
 
 Raíz anota cada llamada a la IA y cada consulta de un agente, y lo muestra en **IA: ver consumo de tokens**.
+
+También incorpora ideas de [graphify](https://github.com/Graphify-Labs/graphify), [memU](https://github.com/NevaMind-AI/memU) y [Serena](https://github.com/oraios/serena), reescritas desde cero:
+- **Escribir por secciones** en vez de reescribir páginas: 91 % menos tokens de salida en la prueba.
+- **Lecciones entre sesiones**, para no volver a investigar lo mismo.
+- **Búsqueda por significado** con resguardo de RAM: mejoró 5 de 12 consultas y no empeoró ninguna.
+- **Recorrido del grafo** que no se pierde por las notas centrales.
 
 ### Instalación
 1. Descarga o clona este repositorio y ábrelo en [Obsidian](https://obsidian.md) como vault. Necesitas una versión reciente: 1.9 o superior para las bases, y la última para el Llavero.
@@ -106,7 +112,7 @@ An Obsidian vault for organizing personal, academic and training life, with the 
 | **Library** | Games, books, anime, manga, movies, series, videos and courses, with automatic covers, filters and a status board. |
 | **Knowledge** | Maps of content, unlinked mentions, AI-related notes, questions over the whole vault and spaced repetition. |
 | **Wiki for AI and agents** | A knowledge base maintained by the AI (the *LLM Wiki* pattern): linked summaries, entities, concepts and topics. It comes with ready-made rules for agents in `AGENTS.md`, and Raíz keeps the index, log and data up to date by itself. |
-| **Token savings that scale** | `boveda`, a tool for agents (CLI and MCP server) that searches and reads by section: ~630 tokens per search with 100 notes and with 20,000. It measures its own savings and the token use of Raíz's AI, and never lets private notes out. |
+| **Token savings that scale** | `boveda`, a tool for agents (CLI and MCP server). It searches by keyword and by meaning, reads and writes by section, walks the graph and remembers lessons across sessions: ~630 tokens per search with 100 notes and with 20,000. It measures its own savings and never lets private notes out. |
 | **Inbox, agenda and tags** | Quick capture, events and meetings, dated tasks and organized tags. |
 | **Customization** | A background image per note or per section (including images from your PC), typography for body text, headings and the interface, and the "night forest" theme. |
 
@@ -144,6 +150,12 @@ The ideas come from [Lymi](https://github.com/haruxvi/Lymi), another project of 
 - Savings are measured, not promised.
 
 Raíz logs every AI call and every agent query, and shows them in **IA: ver consumo de tokens**.
+
+It also takes ideas from [graphify](https://github.com/Graphify-Labs/graphify), [memU](https://github.com/NevaMind-AI/memU) and [Serena](https://github.com/oraios/serena), rewritten from scratch:
+- **Writing by section** instead of rewriting pages: 91% fewer output tokens in the test.
+- **Lessons across sessions**, so the agent doesn't research the same thing twice.
+- **Search by meaning** with a RAM safeguard: it improved 5 of 12 queries and made none worse.
+- **Graph walking** that doesn't get lost through hub notes.
 
 ### Getting started
 1. Download or clone this repository and open it in [Obsidian](https://obsidian.md) as a vault. Use a recent version: 1.9 or later for databases, and the latest one for the keychain.

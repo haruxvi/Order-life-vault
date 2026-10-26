@@ -218,6 +218,10 @@ El problema de fondo: mientras más notas y enlaces tiene el vault, más lee un 
 - **`esqueleto`** y **`seccion`** muestran de qué trata una nota y leen solo la parte necesaria.
 - **`vecinos`** recorre el grafo con el resumen de una línea de cada nota enlazada, sin abrirlas.
 - **`datos`** entrega tus datos diarios como tabla.
+- **`explorar`** muestra el vecindario de un tema hasta 3 saltos, y **`camino`** cómo se conectan dos notas. Las notas centrales, como esta guía, se muestran pero no se recorre a través de ellas, para no llenar la respuesta con todo el vault.
+- **Busca por palabras y por significado.** "aprendizaje automático" encuentra *Machine Learning* y "pila y montículo" encuentra *Heap y Stack*: en una prueba con 12 consultas, mejoró 5 y no empeoró ninguna. Reutiliza los vectores que Raíz ya calcula, y en un equipo con menos de 12 GB de RAM solo se activa si el modelo de embeddings ya está cargado, para no quitarle memoria a lo demás.
+- **Escribe por secciones.** El agente agrega o cambia una sección sin reescribir la página: en la prueba gastó un 91 % menos. Solo escribe dentro de `13 Wiki`, nunca en `Fuentes/`, guarda un respaldo antes de cada cambio y, en lo que marcaste `revisado: true`, solo puede agregar.
+- **Recuerda entre sesiones.** Cuando una respuesta guardada sirve, no lleva a nada o la corriges, se anota en su propiedad `resultado` (`util`, `sin_salida` o `corregida`). Con eso, **`lecciones`** le dice al agente qué fuentes ya funcionaron, qué búsquedas evitar y qué corregiste.
 - **Medido:** ~630 tokens por búsqueda con 100 notas y con 20.000, mientras que abrir las notas que coinciden pasa de ~2.700 a ~525.000.
 
 **Conectarla a tu agente:** en **Ajustes → Raíz → Agentes externos (MCP)**, o con el comando **Agentes: copiar la configuración MCP de la bóveda**, copias la configuración y la pegas en tu agente:

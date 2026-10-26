@@ -5,24 +5,43 @@ Este vault de Obsidian ordena la vida personal, académica y de entrenamiento de
 ## Ahorra tokens: consulta, no leas
 Mientras más crece el vault, más caro sale leer notas completas. Usa la herramienta **`boveda`**: su costo depende de lo que es relevante, no del tamaño del vault. Medido: ~630 tokens por búsqueda tanto con 100 como con 20.000 notas, mientras que abrir las notas que coinciden pasa de ~2.700 a ~525.000 tokens.
 
+**Para leer:**
+
 | Necesitas | Herramienta MCP `raiz-boveda` | Sin MCP (terminal, desde la carpeta del vault) |
 |---|---|---|
-| Encontrar algo | `buscar` | `node .obsidian/plugins/raiz/boveda.js buscar "consulta"` |
+| Lo aprendido en sesiones anteriores (**al empezar**) | `lecciones` | `node .obsidian/plugins/raiz/boveda.js lecciones` |
+| Encontrar algo (por palabras y por significado) | `buscar` | `… boveda.js buscar "consulta"` |
 | Ver de qué trata una nota y sus secciones | `esqueleto` | `… boveda.js esqueleto "Nota"` |
 | Leer solo una parte de una nota | `seccion` | `… boveda.js seccion "Nota" "Título"` |
-| Recorrer el grafo (enlaces y quién enlaza) | `vecinos` | `… boveda.js vecinos "Nota"` |
+| Enlaces de una nota y quién la enlaza | `vecinos` | `… boveda.js vecinos "Nota"` |
+| El vecindario de un tema, hasta 3 saltos | `explorar` | `… boveda.js explorar "Nota" --profundidad 2` |
+| Cómo se conectan dos notas | `camino` | `… boveda.js camino "Nota A" "Nota B"` |
 | Datos diarios (sueño, peso, metas, ánimo…) | `datos` | `… boveda.js datos --desde 2026-10-01 --columnas sueno,peso` |
 | Cuánto ahorraste | `medicion` | `… boveda.js medicion` |
+
+**Para escribir en la wiki** (nunca reescribas una página entera: cuesta muchos tokens de salida):
+
+| Necesitas | Herramienta MCP | Terminal |
+|---|---|---|
+| Página nueva, con su encabezado correcto | `crear_pagina` | `… boveda.js crear concepto "Título" --resumen "…" --fuentes "A,B" --cuerpo "…"` |
+| Sumar a una sección (Menciones, Contradicciones…) | `agregar_a_seccion` | `… boveda.js agregar "Página" "Sección" "texto"` |
+| Cambiar solo una sección | `reemplazar_seccion` | `… boveda.js reemplazar "Página" "Sección" "texto"` |
+| Anotar en el Registro | `registrar` | `… boveda.js registrar ingesta "Título" --paginas "A,B"` |
+| Cómo resultó una respuesta guardada | `marcar_resultado` | `… boveda.js marcar "Respuesta" util` |
+
+Las herramientas de escritura solo trabajan dentro de `13 Wiki`, no tocan `Fuentes/` y guardan un respaldo antes de cada cambio. En una página con `revisado: true` no reemplazan nada: solo agregan.
 
 Los comandos de terminal se ejecutan desde la carpeta del vault, esté donde esté. Si tu carpeta de configuración no se llama `.obsidian`, cambia esa parte de la ruta. La herramienta encuentra el vault sola.
 
 Reglas de presupuesto:
-1. **`buscar` antes de abrir cualquier nota.** Te devuelve `ruta:línea` y un fragmento; casi siempre basta.
-2. **Lee secciones, no notas.** Abre una nota completa solo si `esqueleto` muestra que la necesitas entera.
-3. **Recorre el grafo con `vecinos`**, que trae el resumen de una línea de cada nota enlazada, en vez de abrirlas.
-4. **Si llevas 5 notas completas leídas en una tarea, detente** y vuelve a `buscar` con mejores palabras.
-5. Para la wiki, `13 Wiki/Índice.md` sirve mientras sea chico. Con más de 150 páginas se divide solo en `13 Wiki/Índices/`, pero aun así `buscar` es más barato.
-6. Las últimas acciones: `grep "^## \[" "13 Wiki/Registro.md" | tail -5`.
+1. **Al empezar una sesión, `lecciones`.** Dice qué fuentes ya sirvieron, qué búsquedas no llevaron a nada y qué corrigió la persona, para que no lo repitas.
+2. **`buscar` antes de abrir cualquier nota.** Te devuelve `ruta:línea` y un fragmento; casi siempre basta.
+3. **Lee secciones, no notas.** Abre una nota completa solo si `esqueleto` muestra que la necesitas entera.
+4. **Recorre el grafo con `vecinos`, `explorar` o `camino`**, que traen el resumen de una línea de cada nota, en vez de abrirlas.
+5. **Si llevas 5 notas completas leídas en una tarea, detente** y vuelve a `buscar` con mejores palabras.
+6. **Escribe por secciones** con `agregar_a_seccion` y `reemplazar_seccion`. Cuando guardes una respuesta y la persona diga si sirvió, márcalo con `marcar_resultado`.
+7. Para la wiki, `13 Wiki/Índice.md` sirve mientras sea chico. Con más de 150 páginas se divide solo en `13 Wiki/Índices/`, pero aun así `buscar` es más barato.
+8. Las últimas acciones: `grep "^## \[" "13 Wiki/Registro.md" | tail -5`.
 
 **Privacidad:** las notas con `privado: true` (o la etiqueta `privado`) no salen por la herramienta. No las abras por tu cuenta.
 
