@@ -1278,6 +1278,8 @@ module.exports = class RaizPlugin extends Plugin {
     this.addCommand({ id: 'wiki-ingest-pick', name: 'Wiki: ingerir una fuente…', callback: () => this.pickToIngest() });
     this.addCommand({ id: 'wiki-ask', name: 'Wiki: preguntar a la wiki', callback: () => new WikiAskModal(this).open() });
     this.addCommand({ id: 'wiki-lint', name: 'Wiki: revisar la salud', callback: () => this.run(() => this.lintWiki()) });
+    this.addCommand({ id: 'agents-mcp', name: 'Agentes: copiar la configuración MCP de la bóveda', callback: () => this.copyMcpConfig() });
+    this.addCommand({ id: 'ai-usage', name: 'IA: ver consumo de tokens', callback: () => this.run(() => this.showUsage()) });
     this.addCommand({ id: 'wiki-refresh', name: 'Wiki: actualizar índice y datos para agentes', callback: () => this.run(async () => (await this.writeWikiIndex(), await this.exportWikiData(), new Notice('Índice y datos de la wiki actualizados.'))) });
     this.addCommand({ id: 'ai-scan', name: 'IA: buscar mis IAs y configurarlas', callback: () => new AiScanModal(this).open() });
     this.addCommand({ id: 'pull-models', name: 'Descargar modelos de IA recomendados', callback: () => this.pullModels() });
@@ -1737,6 +1739,7 @@ module.exports = class RaizPlugin extends Plugin {
     if (c.kind === 'anthropic') {
       const res = await this.aiRequest(`${c.baseUrl}/messages`, { headers: this.aiHeaders(c, id), body: { model, system: sys, max_tokens: max, temperature, messages: [{ role: 'user', content: prompt }] } });
       if (res.status >= 400) throw new Error(`${c.label}: ${this.aiError(res)}`);
+      this.lastUsage = { entrada: res.json?.usage?.input_tokens, salida: res.json?.usage?.output_tokens };
       return (res.json?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
     }
     // Formato OpenAI (OpenAI, DeepSeek, Kimi, Qwen, Gemini, OpenRouter, Groq, LM Studio…)
@@ -1746,6 +1749,7 @@ module.exports = class RaizPlugin extends Plugin {
       const res = await this.aiRequest(`${c.baseUrl}/chat/completions`, { headers: this.aiHeaders(c, id), body });
       if (res.status < 400) {
         const m = res.json?.choices?.[0]?.message;
+        this.lastUsage = { entrada: res.json?.usage?.prompt_tokens, salida: res.json?.usage?.completion_tokens };
         return String(m?.content ?? '');
       }
       const msg = this.aiError(res);
@@ -1929,8 +1933,12 @@ module.exports = class RaizPlugin extends Plugin {
     if (this.aiId() !== 'ollama') {
       if (!model && this.aiConf().kind !== 'cli') throw new Error(`Elige un modelo para ${this.aiConf().label} en Ajustes → Raíz → Inteligencia artificial.`);
       const n = new Notice(`✦ ${label} · ${model}…`, 0);
+      const t0 = Date.now();
       try {
-        const content = cleanResponse(await this.chatRemote({ system, prompt, schema, temperature, maxTokens, model }));
+        this.lastUsage = null;
+        const raw = await this.chatRemote({ system, prompt, schema, temperature, maxTokens, model });
+        this.logUsage({ label, model, t0, prompt: (system || '') + prompt, out: raw });
+        const content = cleanResponse(raw);
         if (!content) throw new Error('El modelo respondió vacío. Intenta de nuevo.');
         return schema ? parseJson(content) : content;
       } finally {
@@ -1972,6 +1980,8 @@ module.exports = class RaizPlugin extends Plugin {
         if (/not found|pull/i.test(msg)) throw new Error(`Falta el modelo "${model}". Usa el comando "Raíz: Descargar modelos de IA recomendados".`);
         throw new Error(`Ollama: ${msg}`);
       }
+      this.lastUsage = { entrada: res.json?.prompt_eval_count, salida: res.json?.eval_count };
+      this.logUsage({ label, model, t0: Date.now() - (res.json?.total_duration ? res.json.total_duration / 1e6 : 0), prompt: body.messages.map((m) => m.content).join('\n'), out: res.json?.message?.content || '' });
       const content = cleanResponse(res.json?.message?.content ?? '');
       if (!content) throw new Error('El modelo respondió vacío. Intenta de nuevo.');
       return schema ? parseJson(content) : content;
@@ -4872,7 +4882,7 @@ module.exports = class RaizPlugin extends Plugin {
     scored.sort((a, b) => b.score - a.score);
     // Solo las notas realmente cercanas a la pregunta (máximo 5)
     const top = scored[0]?.score ?? 0;
-    const sources = scored.filter((s, i) => i < 2 || s.score >= top - 0.12).slice(0, 5);
+    const sources = scored.filter((s) => this.isLocalAI() || !this.isPrivate(s.file)).filter((s, i) => i < 2 || s.score >= top - 0.12).slice(0, 5);
     if (!sources.length) throw new Error('No hay notas indexadas todavía.');
     const ctx = [];
     for (const [i, s] of sources.entries()) ctx.push(`[${i + 1}] ${s.file.basename}\n${(await this.embedSource(s.file)).slice(0, 1200)}`);
@@ -4893,6 +4903,103 @@ module.exports = class RaizPlugin extends Plugin {
     return { answer, sources };
   }
 
+  // ───────────── Consumo: medir antes de afirmar ahorro ─────────────
+  usageFile() {
+    return `${this.manifest.dir}/consumo.jsonl`;
+  }
+  /** Una línea por llamada a la IA: proveedor, modelo, modo (local, API o suscripción), tokens y tiempo. */
+  logUsage({ label, model, t0, prompt, out }) {
+    const c = this.aiConf();
+    const u = this.lastUsage || {};
+    const real = Number.isFinite(u.entrada) && Number.isFinite(u.salida);
+    const row = {
+      ts: new Date().toISOString(),
+      proveedor: this.aiId(),
+      modelo: model || '(el de tu cuenta)',
+      modo: c.kind === 'cli' ? 'suscripcion' : this.isLocalAI() ? 'local' : 'api',
+      uso: String(label || '').slice(0, 60),
+      entrada: real ? u.entrada : Math.round(String(prompt || '').length / 4),
+      salida: real ? u.salida : Math.round(String(out || '').length / 4),
+      estimado: !real,
+      ms: Math.max(0, Math.round(Date.now() - (t0 || Date.now()))),
+    };
+    this.app.vault.adapter.append(this.usageFile(), JSON.stringify(row) + '\n').catch(() => {});
+  }
+  async readJsonl(path) {
+    try {
+      return (await this.app.vault.adapter.read(path)).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    } catch (e) {
+      return [];
+    }
+  }
+  async usageSummary(days = 30) {
+    const since = moment().subtract(days, 'days').toISOString();
+    const rows = (await this.readJsonl(this.usageFile())).filter((r) => r.ts >= since);
+    const by = {};
+    for (const r of rows) {
+      const k = r.modo;
+      by[k] = by[k] || { llamadas: 0, entrada: 0, salida: 0, estimadas: 0 };
+      by[k].llamadas++;
+      by[k].entrada += r.entrada || 0;
+      by[k].salida += r.salida || 0;
+      if (r.estimado) by[k].estimadas++;
+    }
+    const agent = await this.readJsonl(`${this.manifest.dir}/.boveda-medicion.jsonl`);
+    const dev = agent.reduce((a, r) => a + r.devueltos, 0);
+    const comp = agent.reduce((a, r) => a + r.completos, 0);
+    return { rows, by, agent: { llamadas: agent.length, devueltos: Math.round(dev / 4), completos: Math.round(comp / 4) } };
+  }
+  /** Ventana con el consumo de los últimos 30 días: lo de Raíz y lo que ahorró la herramienta de agentes. */
+  async showUsage() {
+    const u = await this.usageSummary(30);
+    const m = new Modal(this.app);
+    m.modalEl.addClass('raiz-media-modal');
+    const c = m.contentEl;
+    c.createEl('h3', { text: 'Consumo de IA · últimos 30 días' });
+    const nombres = { local: 'Local (gratis)', api: 'API (pago por uso)', suscripcion: 'Suscripción (cuenta en tu plan)' };
+    if (!u.rows.length) c.createDiv({ cls: 'raiz-muted', text: 'Todavía no hay llamadas registradas. Cada vez que Raíz usa la IA, queda anotado aquí.' });
+    else
+      this.table(
+        c,
+        ['Modo', 'Llamadas', 'Tokens de entrada', 'Tokens de salida'],
+        Object.entries(u.by).map(([k, v]) => [nombres[k] || k, v.llamadas, v.entrada.toLocaleString('es-CL') + (v.estimadas ? ' *' : ''), v.salida.toLocaleString('es-CL')])
+      );
+    if (Object.values(u.by).some((v) => v.estimadas)) c.createDiv({ cls: 'raiz-muted', text: '* Algunas llamadas son estimadas (≈4 caracteres por token) porque el proveedor no informó su uso, por ejemplo las CLIs de suscripción.' });
+    const porUso = {};
+    for (const r of u.rows) porUso[r.uso] = (porUso[r.uso] || 0) + (r.entrada || 0) + (r.salida || 0);
+    const top = Object.entries(porUso).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (top.length) {
+      c.createEl('h4', { text: 'En qué se usa' });
+      this.table(c, ['Uso', 'Tokens'], top.map(([k, v]) => [k, v.toLocaleString('es-CL')]));
+    }
+    c.createEl('h4', { text: 'Herramienta de agentes (bóveda)' });
+    c.createDiv({
+      cls: 'raiz-muted',
+      text: u.agent.llamadas
+        ? `${u.agent.llamadas} consultas. Devolvió ~${u.agent.devueltos.toLocaleString('es-CL')} tokens, frente a ~${u.agent.completos.toLocaleString('es-CL')} si el agente hubiera abierto esas notas completas (${Math.max(0, Math.round((1 - u.agent.devueltos / (u.agent.completos || 1)) * 100))} % menos).`
+        : 'Ningún agente la ha usado todavía. Copia su configuración con "Agentes: copiar la configuración MCP de la bóveda".',
+    });
+    m.open();
+  }
+  /** Configuración MCP lista para pegar en tu agente (Codex, OpenCode, Hermes, Claude Code…). */
+  mcpConfig() {
+    let base = '';
+    try {
+      base = this.app.vault.adapter.getBasePath();
+    } catch (e) {
+      /* móvil */
+    }
+    const script = base ? `${base}/${this.manifest.dir}/boveda.js`.replace(/\\/g, '/') : `${this.manifest.dir}/boveda.js`;
+    return { command: 'node', args: [script, 'mcp'], env: { RAIZ_VAULT: base.replace(/\\/g, '/') } };
+  }
+  copyMcpConfig() {
+    const cfg = this.mcpConfig();
+    const json = JSON.stringify({ mcpServers: { 'raiz-boveda': cfg } }, null, 2);
+    navigator.clipboard.writeText(json);
+    new Notice('Configuración MCP copiada. Pégala en la configuración de tu agente (la guía explica dónde).', 8000);
+    return json;
+  }
+
   // ═════════════════════════════ Wiki mantenida por IA (patrón "LLM Wiki") ═════════════════════════════
   // La IA (la de Raíz o un agente externo) escribe en 13 Wiki; Raíz lleva la contabilidad mecánica
   // (índice, registro, revisión y datos en CSV) para que nadie gaste tokens en eso.
@@ -4906,7 +5013,7 @@ module.exports = class RaizPlugin extends Plugin {
     return new Set(['Índice.md', 'Registro.md', 'Revisión.md', 'Wiki.md'].map((n) => this.wikiSub(n)));
   }
   isWikiPage(f) {
-    return f instanceof TFile && f.extension === 'md' && f.path.startsWith(this.wikiDir() + '/') && !f.path.startsWith(this.wikiSub('Fuentes/')) && !f.path.startsWith(this.wikiSub('Datos/')) && !this.wikiSystemPaths().has(f.path);
+    return f instanceof TFile && f.extension === 'md' && f.path.startsWith(this.wikiDir() + '/') && !f.path.startsWith(this.wikiSub('Fuentes/')) && !f.path.startsWith(this.wikiSub('Datos/')) && !f.path.startsWith(this.wikiSub('Índices/')) && !this.wikiSystemPaths().has(f.path);
   }
   wikiPages() {
     return this.app.vault.getMarkdownFiles().filter((f) => this.isWikiPage(f));
@@ -4958,7 +5065,7 @@ module.exports = class RaizPlugin extends Plugin {
   }
   onWikiChange(file) {
     if (!file?.path || !this.app.vault.getAbstractFileByPath(this.wikiDir())) return;
-    if (file.path.startsWith(this.wikiDir() + '/') && !this.wikiSystemPaths().has(file.path) && !file.path.startsWith(this.wikiSub('Datos/'))) this.scheduleWiki('index');
+    if (file.path.startsWith(this.wikiDir() + '/') && !this.wikiSystemPaths().has(file.path) && !file.path.startsWith(this.wikiSub('Datos/')) && !file.path.startsWith(this.wikiSub('Índices/'))) this.scheduleWiki('index');
     if (file instanceof TFile && this.levelOf(file) === 'daily') this.scheduleWiki('data');
   }
   /** Índice.md: catálogo de la wiki con el resumen de cada página. Lo primero que lee un agente. */
@@ -4979,9 +5086,17 @@ module.exports = class RaizPlugin extends Plugin {
       const c = this.wikiClassOf(f);
       return groups.some((g) => g[0] === c) ? c : 'otra';
     };
+    const split = pages.length > 150; // con muchas páginas, el índice principal solo trae los temas y un enlace por categoría
+    if (split) L.push(`_La wiki es grande: aquí van los temas completos y cada categoría tiene su propio índice. Mejor aún: busca con la herramienta \`boveda\` (ver AGENTS.md)._`, '');
     for (const [cls, title] of groups) {
       const items = pages.filter((f) => groupOf(f) === cls);
       if (!items.length) continue;
+      if (split && cls !== 'tema') {
+        const sub = [`# Índice · ${title}`, `${items.length} páginas. Lo genera Raíz.`, '', ...items.map((f) => `- [[${f.basename}]] — ${String(this.fm(f).resumen || '').replace(/\s+/g, ' ').trim() || '(sin resumen)'}`), ''];
+        await this.writeIfChanged(this.wikiSub(`Índices/${title}.md`), ['---', 'cssclasses:', '  - raiz-panel', 'tipo: wiki-sistema', '---', ...sub].join('\n'));
+        L.push(`## ${title} (${items.length})`, `Ver [[Índices/${title}|el índice de ${title.toLowerCase()}]].`, '');
+        continue;
+      }
       L.push(`## ${title} (${items.length})`);
       for (const f of items) {
         const fm = this.fm(f);
@@ -5046,8 +5161,12 @@ module.exports = class RaizPlugin extends Plugin {
     if (f instanceof TFile) await this.app.vault.process(f, (d) => d.replace(/\s*$/, '\n') + entry);
     else await this.writeIfChanged(path, `# Registro de la wiki\n${entry}`);
   }
+  isPrivate(file) {
+    const fm = this.fm(file);
+    return fm.privado === true || /^(true|sí|si)$/i.test(String(fm.privado || '')) || toArr(fm.tags).map((t) => String(t).toLowerCase()).includes('privado');
+  }
   wikiFm(clase, resumen, fuentes) {
-    return ['---', 'tipo: wiki', `clase: ${clase}`, `resumen: ${JSON.stringify(String(resumen || '').replace(/\s+/g, ' ').trim())}`, 'fuentes:', ...fuentes.map((s) => `  - ${JSON.stringify(`[[${s}]]`)}`), `actualizado: ${isoDate(moment())}`, 'tags:', '  - wiki', '---'].join('\n');
+    return ['---', 'tipo: wiki', `clase: ${clase}`, `resumen: ${JSON.stringify(String(resumen || '').replace(/\s+/g, ' ').trim())}`, 'fuentes:', ...fuentes.map((s) => `  - ${JSON.stringify(`[[${s}]]`)}`), `actualizado: ${isoDate(moment())}`, 'revisado: false', 'tags:', '  - wiki', '---'].join('\n');
   }
   /** Agrega una mención a una entidad o concepto (o lo crea) sin tocar lo que ya tenía. */
   async wikiMention(name, clase, resumenPage, dato, sourceName) {
@@ -5082,6 +5201,7 @@ module.exports = class RaizPlugin extends Plugin {
     if (this.isWikiPage(file) || this.wikiSystemPaths().has(file.path)) throw new Error('Esa nota ya es parte de la wiki. Abre una fuente: un artículo de Fuentes, un libro, un apunte…');
     if (file.extension !== 'md') throw new Error('Por ahora la IA de Raíz lee notas .md. Para un PDF, pídeselo a tu agente o conviértelo a texto.');
     await this.ensureWiki();
+    if (this.isPrivate(file) && !this.isLocalAI()) throw new Error('Esa nota es privada (privado: true): con una IA en la nube no sale de tu equipo. Usa una IA local para ingerirla.');
     const text = (await this.noteText(file)).slice(0, this.wikiCharBudget());
     if (!this.hasContent(text)) throw new Error('La nota está casi vacía: no hay nada que ingerir.');
     const known = this.wikiPages()
@@ -5166,6 +5286,7 @@ module.exports = class RaizPlugin extends Plugin {
     const stop = new Set('el la los las un una unos unas de del al a y o u en con por para que qué como cómo cual cuál es son fue ser se mi mis tu tus me te lo le les su sus sobre entre más menos muy ya no si sí cuando donde dónde quien quién'.split(' '));
     const words = norm(question).split(/[^a-z0-9ñ]+/).filter((w) => w.length > 2 && !stop.has(w));
     const scored = pages
+      .filter((f) => this.isLocalAI() || !this.isPrivate(f))
       .map((f) => {
         const name = norm(f.basename);
         const res = norm(this.fm(f).resumen || '');
@@ -7407,6 +7528,14 @@ class RaizSettingTab extends PluginSettingTab {
       .addText((t) => t.setValue(String(s.numCtx)).onChange(async (v) => ((s.numCtx = clamp(parseInt(v, 10) || 8192, 2048, 65536)), await save())));
     }
     }
+    new Setting(containerEl)
+      .setName('Consumo de tokens')
+      .setDesc('Cada llamada a la IA queda anotada (proveedor, modelo, tokens y tiempo), solo en este equipo. Así el ahorro se mide, no se supone.')
+      .addButton((b) => b.setButtonText('Ver consumo').onClick(() => p.run(() => p.showUsage())));
+    new Setting(containerEl)
+      .setName('Agentes externos (MCP)')
+      .setDesc('Conecta tu agente (Codex, OpenCode, Hermes, Claude Code…) a la herramienta "bóveda": busca y lee por secciones, gastando lo mismo con 100 notas que con 10.000.')
+      .addButton((b) => b.setButtonText('Copiar configuración').onClick(() => p.copyMcpConfig()));
     new Setting(containerEl)
       .setName('Sobre ti')
       .setDesc('La IA usa esto como contexto. Cuéntale tu situación.')

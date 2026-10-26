@@ -19,7 +19,8 @@ Un vault de Obsidian para ordenar la vida personal, académica y de entrenamient
 | **Estudio estilo Notion** | Páginas con portada, ícono, propiedades y subpáginas, y bases con vistas (tabla, tarjetas, lista). Dentro de cualquier nota puedes insertar páginas enlazadas, bases, tarjetas o cualquier módulo. Puedes escribir a mano o con IA. |
 | **Biblioteca** | Juegos, libros, anime, manga, películas, series, videos y cursos, con portadas automáticas, filtros y un tablero por estado. |
 | **Conocimiento** | Mapas de contenido, menciones sin enlazar, notas relacionadas con IA, preguntas a todo el vault y repaso espaciado. |
-| **Wiki para IA y agentes** | Una base de conocimiento que mantiene la IA (patrón *LLM Wiki*): resúmenes, entidades, conceptos y temas enlazados. Trae reglas listas para agentes en `AGENTS.md`, y Raíz mantiene solo el índice, el registro y los datos para que el agente gaste menos tokens. |
+| **Wiki para IA y agentes** | Una base de conocimiento que mantiene la IA (patrón *LLM Wiki*): resúmenes, entidades, conceptos y temas enlazados. Trae reglas listas para agentes en `AGENTS.md`, y Raíz mantiene solo el índice, el registro y los datos. |
+| **Ahorro de tokens que escala** | `boveda`, una herramienta para agentes (CLI y servidor MCP) que busca y lee por secciones: ~630 tokens por búsqueda con 100 notas y con 20.000. Mide su ahorro y el consumo de la IA de Raíz, y nunca deja salir las notas privadas. |
 | **Bandeja, agenda y etiquetas** | Captura rápida, eventos y reuniones, tareas con fecha y etiquetas organizadas. |
 | **Personalización** | Imagen de fondo por nota o por apartado (también desde tu PC), tipografía para el texto, los títulos y la interfaz, y el tema "bosque nocturno". |
 
@@ -39,6 +40,24 @@ Haz clic en **✦ IA**, abajo a la derecha. Raíz busca lo que tienes, elige el 
 - **Las suscripciones** no traen API key, así que se usan con el programa oficial de cada empresa: lo instalas e inicias sesión una vez. Solo funcionan en el computador.
 - **Las API keys** quedan cifradas en el **Llavero** de Obsidian, solo en tu equipo: nunca en el vault ni en este repositorio.
 - **Privacidad:** con IA local tus notas no salen de tu PC. Con un servicio en la nube o una suscripción, el texto que la IA analiza se envía a ese servicio.
+
+### Un vault grande no debería costar más tokens
+Un agente sin mapa lee notas completas: mientras más crece el vault, más paga por cada tarea. `boveda` hace que el agente **consulte** en vez de leer. Esta es la misma búsqueda medida en vaults de tamaño creciente:
+
+| Notas en el vault | Con `boveda` | Abriendo cada nota que coincide |
+|---:|---:|---:|
+| 100 | ~640 tokens | ~2.700 tokens |
+| 1.000 | ~620 tokens | ~26.000 tokens |
+| 5.000 | ~630 tokens | ~131.000 tokens |
+| 20.000 | ~630 tokens | ~525.000 tokens |
+
+Las ideas vienen de [Lymi](https://github.com/haruxvi/Lymi), otro proyecto mío:
+- El índice nunca entra completo al contexto.
+- Se devuelven secciones, no archivos.
+- Cada respuesta tiene un presupuesto fijo.
+- El ahorro se mide, no se promete.
+
+Raíz anota cada llamada a la IA y cada consulta de un agente, y lo muestra en **IA: ver consumo de tokens**.
 
 ### Instalación
 1. Descarga o clona este repositorio y ábrelo en [Obsidian](https://obsidian.md) como vault. Necesitas una versión reciente: 1.9 o superior para las bases, y la última para el Llavero.
@@ -64,7 +83,7 @@ En el iPhone o Android todo funciona menos la IA local: usa un proveedor con API
 | `13 Wiki` | Wiki mantenida por la IA: índice, registro, fuentes, resúmenes, entidades, conceptos, temas y respuestas |
 
 ### Qué no se sube a este repositorio
-Tus API keys, las fuentes de `13 Wiki/Fuentes` y los datos de `13 Wiki/Datos`, tus imágenes de `06 Plantillas/Portadas`, las portadas descargadas de la biblioteca, tus fuentes propias, el índice de la IA (`vectores.json`) y el estado de tu espacio de trabajo.
+Tus API keys, las fuentes de `13 Wiki/Fuentes` y los datos de `13 Wiki/Datos`, tus imágenes de `06 Plantillas/Portadas`, las portadas descargadas de la biblioteca, tus fuentes propias, el índice de la IA (`vectores.json`), la caché y la medición de `boveda`, tu registro de consumo y el estado de tu espacio de trabajo.
 
 ### Aviso sobre software de terceros
 Los plugins de la comunidad que vienen en `.obsidian/plugins` **no son de mi autoría**. Pertenecen a sus autores y se incluyen sin modificaciones, cada uno con su licencia original. Los servicios y programas de IA externos se rigen por sus propios términos. El detalle está en **[TERCEROS.md](TERCEROS.md)**.
@@ -86,7 +105,8 @@ An Obsidian vault for organizing personal, academic and training life, with the 
 | **Notion-style study** | Pages with a cover, an icon, properties and subpages, plus databases with views (table, cards, list). Inside any note you can insert linked pages, databases, page cards or any module. Write by hand or with AI. |
 | **Library** | Games, books, anime, manga, movies, series, videos and courses, with automatic covers, filters and a status board. |
 | **Knowledge** | Maps of content, unlinked mentions, AI-related notes, questions over the whole vault and spaced repetition. |
-| **Wiki for AI and agents** | A knowledge base maintained by the AI (the *LLM Wiki* pattern): linked summaries, entities, concepts and topics. It comes with ready-made rules for agents in `AGENTS.md`, and Raíz keeps the index, log and data up to date by itself so the agent spends fewer tokens. |
+| **Wiki for AI and agents** | A knowledge base maintained by the AI (the *LLM Wiki* pattern): linked summaries, entities, concepts and topics. It comes with ready-made rules for agents in `AGENTS.md`, and Raíz keeps the index, log and data up to date by itself. |
+| **Token savings that scale** | `boveda`, a tool for agents (CLI and MCP server) that searches and reads by section: ~630 tokens per search with 100 notes and with 20,000. It measures its own savings and the token use of Raíz's AI, and never lets private notes out. |
 | **Inbox, agenda and tags** | Quick capture, events and meetings, dated tasks and organized tags. |
 | **Customization** | A background image per note or per section (including images from your PC), typography for body text, headings and the interface, and the "night forest" theme. |
 
@@ -106,6 +126,24 @@ Click **✦ IA** in the bottom right corner. Raíz finds what you have, picks th
 - **Subscriptions** don't come with an API key, so they run through each company's official program: install it and sign in once. They only work on a computer.
 - **API keys** are stored encrypted in Obsidian's **keychain**, on your device only. They never end up in the vault or in this repository.
 - **Privacy:** with local AI your notes never leave your computer. With a cloud service or a subscription, the text the AI analyzes is sent to that service.
+
+### A bigger vault shouldn't cost more tokens
+An agent without a map reads whole notes, so the bigger the vault, the more it pays per task. `boveda` makes the agent **query** instead of read. Here is the same search measured on vaults of growing size:
+
+| Notes in the vault | With `boveda` | Opening every matching note |
+|---:|---:|---:|
+| 100 | ~640 tokens | ~2,700 tokens |
+| 1,000 | ~620 tokens | ~26,000 tokens |
+| 5,000 | ~630 tokens | ~131,000 tokens |
+| 20,000 | ~630 tokens | ~525,000 tokens |
+
+The ideas come from [Lymi](https://github.com/haruxvi/Lymi), another project of mine:
+- The index never enters the context whole.
+- Sections are returned, not files.
+- Every answer has a fixed budget.
+- Savings are measured, not promised.
+
+Raíz logs every AI call and every agent query, and shows them in **IA: ver consumo de tokens**.
 
 ### Getting started
 1. Download or clone this repository and open it in [Obsidian](https://obsidian.md) as a vault. Use a recent version: 1.9 or later for databases, and the latest one for the keychain.
@@ -131,7 +169,7 @@ On iPhone or Android everything works except local AI: use an API provider, or y
 | `13 Wiki` | AI-maintained wiki: index, log, sources, summaries, entities, concepts, topics and answers |
 
 ### What is not in this repository
-Your API keys, the sources in `13 Wiki/Fuentes` and the data in `13 Wiki/Datos`, your images in `06 Plantillas/Portadas`, library covers downloaded from external services, your own font files, the AI index (`vectores.json`) and your workspace state.
+Your API keys, the sources in `13 Wiki/Fuentes` and the data in `13 Wiki/Datos`, your images in `06 Plantillas/Portadas`, library covers downloaded from external services, your own font files, the AI index (`vectores.json`), the cache and measurements of `boveda`, your usage log and your workspace state.
 
 ### Third-party software notice
 The community plugins bundled in `.obsidian/plugins` were **not written by me**. They belong to their respective authors and are included unmodified, each under its original license. External AI services and programs are governed by their own terms. Details are in **[THIRD_PARTY.md](THIRD_PARTY.md)**.

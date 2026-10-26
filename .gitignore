@@ -27,3 +27,8 @@
 13 Wiki/Fuentes/*
 !13 Wiki/Fuentes/.gitkeep
 13 Wiki/Datos/
+
+# Datos locales de Raíz: consumo de IA y la caché de la herramienta para agentes
+.obsidian/plugins/raiz/consumo.jsonl
+.obsidian/plugins/raiz/.boveda-cache.json
+.obsidian/plugins/raiz/.boveda-medicion.jsonl

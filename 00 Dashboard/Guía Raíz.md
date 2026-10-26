@@ -212,6 +212,27 @@ La división es simple:
   - Exporta tus datos diarios a `Datos/diario.csv`, así el agente lee una tabla en vez de cientos de notas.
   - El archivo `.ignore` evita que el agente lea configuraciones, plantillas e imágenes.
 
+### Que un vault grande no cueste más tokens
+El problema de fondo: mientras más notas y enlaces tiene el vault, más lee un agente por tarea. Raíz trae **`boveda`**, una herramienta de consulta para agentes, con un contrato simple: **el costo depende de lo relevante, no del tamaño del vault.**
+- **`buscar`** devuelve las secciones que importan (`ruta:línea` y un fragmento), no notas enteras.
+- **`esqueleto`** y **`seccion`** muestran de qué trata una nota y leen solo la parte necesaria.
+- **`vecinos`** recorre el grafo con el resumen de una línea de cada nota enlazada, sin abrirlas.
+- **`datos`** entrega tus datos diarios como tabla.
+- **Medido:** ~630 tokens por búsqueda con 100 notas y con 20.000, mientras que abrir las notas que coinciden pasa de ~2.700 a ~525.000.
+
+**Conectarla a tu agente:** en **Ajustes → Raíz → Agentes externos (MCP)**, o con el comando **Agentes: copiar la configuración MCP de la bóveda**, copias la configuración y la pegas en tu agente:
+- **Codex**: `~/.codex/config.toml`, en la sección `[mcp_servers.raiz-boveda]`.
+- **OpenCode**: `opencode.json`, en `mcp`.
+- **Hermes** y otros: donde configuren sus servidores MCP.
+
+Si tu agente no usa MCP, puede llamarla desde la terminal: `node .obsidian/plugins/raiz/boveda.js buscar "…"`. Necesitas [Node.js](https://nodejs.org).
+
+**Medir, no suponer:** cada llamada a la IA de Raíz queda anotada con su proveedor, modelo, tokens y tiempo, y cada consulta de un agente, con lo que habría costado abrir esas notas. Lo ves en **IA: ver consumo de tokens**.
+
+**Notas privadas:** con `privado: true` en las propiedades (o la etiqueta `privado`), una nota nunca sale por la herramienta de agentes ni hacia una IA en la nube. Una IA local sí puede leerla.
+
+**Lo que escribe la IA nace con `revisado: false`.** Cámbialo a `true` cuando lo revises: así tú y tus agentes distinguen una afirmación de la IA de algo que confirmaste.
+
 **Privacidad:** `Fuentes/` y `Datos/` no se suben a GitHub. Las páginas de la wiki **sí** se suben, igual que tus notas. Si la usas para temas personales y tu repositorio es público, tenlo en cuenta.
 
 ## 5. Crear cosas
