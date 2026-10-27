@@ -18,39 +18,10 @@ tipoGrafico: line
 ---
 # Octubre 2026
 [[2026-Q4|]]
-`BUTTON[raiz-ant, raiz-sup, raiz-sig]`
-```meta-bind-button
-id: raiz-ant
-label: "← Mes anterior"
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: open
-    link: "[[03 Mensual/2026/2026-09-septiembre]]"
-    newTab: false
-```
-```meta-bind-button
-id: raiz-sup
-label: "T4 2026"
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: open
-    link: "[[04 Trimestral/2026/2026-Q4]]"
-    newTab: false
-```
-```meta-bind-button
-id: raiz-sig
-label: "Mes siguiente →"
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: open
-    link: "[[03 Mensual/2026/2026-11-noviembre]]"
-    newTab: false
+```raiz-botones
+← Mes anterior | abrir: 03 Mensual/2026/2026-09-septiembre
+T4 2026 | abrir: 04 Trimestral/2026/2026-Q4
+Mes siguiente → | abrir: 03 Mensual/2026/2026-11-noviembre
 ```
 
 ```meta-bind
@@ -61,28 +32,9 @@ INPUT[text(placeholder('Ponle nombre a tu mes'), class('raiz-input-big')):alias]
 ```meta-bind
 INPUT[editor(class(raiz-editor)):resumen]
 ```
-`BUTTON[raiz-ia-resumen, raiz-ia-titulo]`
-```meta-bind-button
-id: raiz-ia-resumen
-label: "Resumir"
-icon: sparkles
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:summarize-current
-```
-```meta-bind-button
-id: raiz-ia-titulo
-label: "Título"
-icon: tag
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:ai-title
+```raiz-botones
+Resumir | comando: raiz:summarize-current | icono: sparkles
+Título | comando: raiz:ai-title | icono: tag
 ```
 
 ## Calendario
@@ -131,17 +83,8 @@ if (window.raiz) await window.raiz.charts.wheelProgression(dv, this.container); 
 
 ### Pregúntale a tu mes
 `INPUT[text(placeholder('Escribe una pregunta…'), class('raiz-input-big')):pregunta]`
-`BUTTON[raiz-preguntar]`
-```meta-bind-button
-id: raiz-preguntar
-label: "Preguntar"
-icon: search
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:ask-note
+```raiz-botones
+Preguntar | comando: raiz:ask-note | icono: search
 ```
 ```meta-bind
 INPUT[editor(class(raiz-editor)):respuesta]

@@ -10,8 +10,25 @@ banner-radius: 25
 tipo: panel
 semanas: 12
 ejercicio: Press banca
-coach: ""
-coachFecha: 
+coach: |-
+  # Cómo vas
+  Esta semana has dado un paso adelante en tu entrenamiento del torso. Aprender una nueva técnica de abdominales ha sido beneficioso y te permite ver progresos pequeños pero reales.
+
+  ## Progresos
+  - Has subido el número de series en ejercicios específicos para los músculos del abdomen, lo que indica un aumento en la resistencia y fortaleza.
+    
+  ## Estancados o en riesgo
+  - No has notado cambios significativos en tu fuerza en los abdominales. La fatiga acumulada podría estar afectando tus resultados.
+
+  ## Plan para la próxima semana
+  1. Realiza 3 series de 8 repeticiones cada una con 50% de descarga, centrándote especialmente en el estiramiento y contracción de los músculos del abdomen.
+  2. Aprende un nuevo ejercicio para los glúteos para equilibrar tu entrenamiento.
+  3. Incorpora ejercicios alternativos para los deltoides, que han sido menos demandados durante este período.
+  4. Planifica tu día con anticipación y asegúrate de tener una hora de descanso antes de la siesta.
+  5. Trata de evitar el uso de dispositivos electrónicos por al menos 30 minutos antes de acostarte para mejorar tu calidad de sueño.
+
+  Meta: 4 sesiones por semana.
+coachFecha: 2026-10-27
 ---
 # Panel de entrenamiento
 **Ver últimas** `INPUT[number:semanas]` semanas · **Progresión de** `INPUT[text(placeholder(ejercicio)):ejercicio]`
@@ -21,28 +38,9 @@ if (window.raiz) await window.raiz.charts.trainingDashboard(dv, this.container);
 ```
 
 ## Coach
-`BUTTON[raiz-coach, raiz-rutina]`
-```meta-bind-button
-id: raiz-coach
-label: "Analizar mis últimas 4 semanas"
-icon: brain
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:training-coach
-```
-```meta-bind-button
-id: raiz-rutina
-label: "Nueva rutina"
-icon: plus
-style: default
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:new-routine
+```raiz-botones
+Analizar mis últimas 4 semanas | comando: raiz:training-coach | icono: brain
+Nueva rutina | comando: raiz:new-routine | icono: plus | estilo: secundario
 ```
 Último análisis: `VIEW[{coachFecha}]`
 ```meta-bind

@@ -499,3 +499,7 @@
 .raiz-wiki-log li { margin: 0.25em 0; }
 .raiz-btn-ic { display: inline-flex; margin-right: 0.35em; vertical-align: -2px; }
 .raiz-btn-ic svg { width: 15px; height: 15px; }
+
+/* ── Botones propios (raiz-botones) ── */
+.raiz-botones { display: flex; flex-wrap: wrap; gap: 0.45em; margin: 0.2em 0 0.5em; }
+.raiz-botones .raiz-btn { display: inline-flex; align-items: center; cursor: pointer; }

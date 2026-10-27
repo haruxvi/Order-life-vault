@@ -972,7 +972,7 @@ class BackgroundModal extends Modal {
     this.plugin = plugin;
     this.file = file;
     this.section = plugin.sectionOf(file);
-    this.scope = 'nota';
+    this.alcance = 'nota';
   }
   onOpen() {
     const p = this.plugin;
@@ -983,9 +983,9 @@ class BackgroundModal extends Modal {
       const scope = contentEl.createDiv({ cls: 'raiz-scope' });
       const opts = [['nota', 'Solo esta nota'], ['apartado', `Todo el apartado: ${this.section.label}`]];
       const btns = opts.map(([k, t]) => {
-        const b = scope.createEl('button', { cls: 'raiz-chip' + (k === this.scope ? ' is-active' : ''), text: t });
+        const b = scope.createEl('button', { cls: 'raiz-chip' + (k === this.alcance ? ' is-active' : ''), text: t });
         b.addEventListener('click', () => {
-          this.scope = k;
+          this.alcance = k;
           btns.forEach((x) => x.removeClass('is-active'));
           b.addClass('is-active');
         });
@@ -995,7 +995,7 @@ class BackgroundModal extends Modal {
     }
     const set = (value) =>
       p.run(async () => {
-        if (this.scope === 'apartado' && this.section) await p.applySectionBanner(this.section, value);
+        if (this.alcance === 'apartado' && this.section) await p.applySectionBanner(this.section, value);
         else await p.setBanner(this.file, value);
         this.close();
       });
@@ -1005,7 +1005,7 @@ class BackgroundModal extends Modal {
       p.run(async () => {
         const u = url.value.trim();
         if (!u) return;
-        const saved = await p.downloadCover(u, `fondo ${this.scope === 'apartado' && this.section ? this.section.label : this.file.basename}`, null, p.settings.folders.covers);
+        const saved = await p.downloadCover(u, `fondo ${this.alcance === 'apartado' && this.section ? this.section.label : this.file.basename}`, null, p.settings.folders.covers);
         await set(saved ? `[[${saved}]]` : u);
       })
     );
@@ -1252,6 +1252,59 @@ class WikiAskModal extends Modal {
   }
 }
 
+// ───────────── Botones propios de Raíz (sin depender del registro de IDs de Meta Bind) ─────────────
+// Formato, una línea por botón:  Etiqueta | abrir: ruta/de/la nota   ·   Etiqueta | comando: raiz:ai-day
+// Opcionales al final:  | icono: zap   ·   | estilo: secundario
+const ICONOS_BOTON = { '⚡': 'zap', '⭐': 'star', '🏷️': 'tag', '✨': 'sparkles', '🔎': 'search', '🎯': 'target', '💡': 'lightbulb', '🌟': 'sun', '🔭': 'telescope', '📥': 'inbox', '📅': 'calendar-plus', '🎓': 'graduation-cap', '🏋️': 'dumbbell', '➕': 'plus', '🧠': 'brain', '🔗': 'link', '🃏': 'layers' };
+function lineasBotones(src) {
+  const out = [];
+  for (const linea of String(src).split(/\r?\n/)) {
+    const partes = linea.split('|').map((x) => x.trim());
+    if (partes.length < 2 || !partes[0]) continue;
+    const b = { etiqueta: partes[0], estilo: 'primario' };
+    for (const p of partes.slice(1)) {
+      const m = p.match(/^(abrir|comando|icono|estilo)\s*:\s*(.+)$/i);
+      if (m) b[m[1].toLowerCase()] = m[2].trim();
+    }
+    if (!b.abrir && !b.comando) continue;
+    const em = b.etiqueta.match(/^([\p{Extended_Pictographic}️‍]+)\s*/u);
+    if (em) {
+      b.icono = b.icono || ICONOS_BOTON[em[1]] || ICONOS_BOTON[em[1].replace(/️/g, '')];
+      b.etiqueta = b.etiqueta.slice(em[0].length);
+    }
+    out.push(b);
+  }
+  return out;
+}
+/** Convierte las filas `BUTTON[...]` + botones ocultos de Meta Bind que generó Raíz en un bloque raiz-botones. */
+function migrarBotones(texto) {
+  let cambios = 0;
+  const nuevo = texto.replace(/^(.*?)`BUTTON\[([^\]]+)\]`(.*)\n((?:```meta-bind-button\n[\s\S]*?\n```\n?)+)/gm, (todo, antes, ids, despues, bloques) => {
+    const defs = {};
+    for (const b of bloques.match(/```meta-bind-button\n[\s\S]*?\n```/g) || []) {
+      const v = (k) => (b.match(new RegExp(`^\\s*${k}:\\s*(.+)$`, 'm')) || [])[1];
+      const id = v('id');
+      if (!id) continue;
+      let etiqueta = v('label') || '';
+      try {
+        etiqueta = JSON.parse(etiqueta);
+      } catch (e) {
+        etiqueta = etiqueta.replace(/^["']|["']$/g, '');
+      }
+      const tipo = v('- type') || (b.match(/^\s*-\s*type:\s*(\S+)/m) || [])[1];
+      const destino = tipo === 'command' ? v('command') : tipo === 'open' ? String(v('link') || '').replace(/^"|"$/g, '').replace(/^\[\[|\]\]$/g, '') : null;
+      if (!destino || !/class:\s*raiz-btn/.test(b)) continue; // solo los botones que generó Raíz
+      defs[id.trim()] = `${etiqueta} | ${tipo === 'command' ? 'comando' : 'abrir'}: ${destino}${v('icon') ? ` | icono: ${v('icon').trim()}` : ''}${/^\s*style:\s*default/m.test(b) ? ' | estilo: secundario' : ''}`;
+    }
+    const lista = ids.split(',').map((x) => x.trim());
+    if (!lista.length || lista.some((id) => !defs[id])) return todo; // si algo no se reconoce, no se toca
+    cambios++;
+    const resto = `${antes}${despues}`.replace(/^\s*·\s*/, '').trim();
+    return `\`\`\`raiz-botones\n${lista.map((id) => defs[id]).join('\n')}\n\`\`\`\n${resto ? resto + '\n' : ''}`;
+  });
+  return { texto: nuevo, cambios };
+}
+
 // ───────────────────────────── Plugin principal ─────────────────────────────
 
 module.exports = class RaizPlugin extends Plugin {
@@ -1263,6 +1316,7 @@ module.exports = class RaizPlugin extends Plugin {
     await this.loadSettings();
 
     this.addSettingTab(new RaizSettingTab(this.app, this));
+    document.querySelectorAll('.status-bar-item.raiz-status').forEach((el) => el.remove()); // restos de una carga anterior
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass('raiz-status');
     this.statusEl.setText('✦ IA…');
@@ -1272,6 +1326,7 @@ module.exports = class RaizPlugin extends Plugin {
     });
     this.loadUserFonts().then(() => this.applyFonts());
 
+    this.registerMarkdownCodeBlockProcessor('raiz-botones', (src, el, ctx) => this.renderBotones(src, el, ctx));
     this.addCommand({ id: 'open-settings', name: 'Abrir ajustes', callback: () => this.openSettings() });
     this.addCommand({ id: 'check-ollama', name: 'Comprobar la IA', callback: () => this.checkAI(true) });
     this.addCommand({ id: 'wiki-ingest', name: 'Wiki: ingerir esta nota', callback: () => this.run(() => this.ingestToWiki()) });
@@ -1289,7 +1344,14 @@ module.exports = class RaizPlugin extends Plugin {
     this.addCommand({ id: 'new-routine', name: 'Nueva rutina de entrenamiento', callback: () => this.newRoutine() });
     this.addCommand({ id: 'insert-routine', name: 'Cargar rutina en la nota de hoy', callback: () => this.run(() => this.insertRoutine()) });
     this.addCommand({ id: 'training-coach', name: 'Coach de entrenamiento (IA)', callback: () => this.run(() => this.trainingCoach()) });
-    this.registerView(CONN_VIEW, (leaf) => new ConnectionsView(leaf, this));
+    // Si una carga anterior no se descargó del todo, la vista sigue registrada y registrarla de nuevo cortaría
+    // la carga entera: se libera primero y, pase lo que pase, el resto del plugin sigue cargando
+    try {
+      if (this.app.viewRegistry?.viewByType?.[CONN_VIEW]) this.app.viewRegistry.unregisterView(CONN_VIEW);
+      this.registerView(CONN_VIEW, (leaf) => new ConnectionsView(leaf, this));
+    } catch (e) {
+      console.error('[Raíz] No pude registrar el panel de conexiones', e);
+    }
     this.registerDomEvent(document, 'keydown', (e) => this.flashKeys?.(e));
     this.addCommand({ id: 'open-connections', name: 'Abrir panel de conexiones', callback: () => this.openConnections() });
     this.addCommand({ id: 'link-all-mentions', name: 'Enlazar todas las menciones de esta nota', callback: () => this.run(() => this.linkAllMentions()) });
@@ -1351,10 +1413,15 @@ module.exports = class RaizPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(async () => {
       this.layoutReadyAt = Date.now();
+      // Los botones viejos se convierten una sola vez en todo el vault; después, solo la nota que se abre (por si llega una vieja sincronizada)
+      if (!this.settings.botonesMigrados) setTimeout(() => this.migrateButtons().catch((e) => console.error('[Raíz] botones', e)), 3000);
+      this.registerEvent(this.app.workspace.on('file-open', (f) => f instanceof TFile && f.extension === 'md' && this.migrateButtonsIn(f).catch(() => {})));
       for (const ev of ['create', 'delete', 'rename']) this.registerEvent(this.app.vault.on(ev, (f) => this.onWikiChange(f)));
       this.registerEvent(this.app.metadataCache.on('changed', (f) => this.onWikiChange(f)));
       setTimeout(() => this.run(async () => (await this.writeWikiIndex(), await this.exportWikiData())), 15000);
       this.registerEvent(this.app.vault.on('create', (f) => this.onLinkedNoteCreated(f).catch((e) => console.error('[Raíz]', e))));
+      // Templater quita la marca del cursor solo si la nota se abre en el editor; si nació en segundo plano, queda escrita
+      this.registerEvent(this.app.vault.on('create', (f) => f instanceof TFile && this.levelOf(f) && this.watchCursorTag(f)));
       if (this.aiId() !== 'ollama') this.checkAI(false);
       if (!this.settings.ai?.configured)
         this.checkAI(false).then((r) => {
@@ -1369,8 +1436,14 @@ module.exports = class RaizPlugin extends Plugin {
   }
 
   onunload() {
-    this.clearFonts();
-    this.stopRest();
+    // Cada paso por separado: si uno falla, los demás igual se ejecutan
+    for (const paso of [() => this.clearFonts(), () => this.stopRest(), () => clearTimeout(this.wikiTimers?.index), () => clearTimeout(this.wikiTimers?.data)]) {
+      try {
+        paso();
+      } catch (e) {
+        console.error('[Raíz] al descargar', e);
+      }
+    }
     if (window.raiz === this.api) delete window.raiz;
   }
 
@@ -5221,18 +5294,27 @@ module.exports = class RaizPlugin extends Plugin {
       },
       required: ['titulo', 'resumen', 'ideas', 'entidades', 'conceptos'],
     };
-    const r = await this.chat({
-      tier: 'deep',
-      temperature: 0.2,
-      maxTokens: 1500,
-      schema,
-      label: 'Ingiriendo en la wiki',
-      system: `${this.systemPrompt()}\nMantienes una wiki personal. Extraes lo importante de una fuente con tus propias palabras, sin inventar nada que no esté en ella.`,
-      prompt:
-        `Analiza la fuente y devuelve:\n- titulo: título corto de la fuente.\n- resumen: una sola frase.\n- ideas: de 3 a 8 ideas clave, cada una una frase con datos concretos.\n- entidades: hasta 8 personas, lugares, herramientas, lenguajes, obras o empresas; "dato" = lo que dice la fuente sobre ella, en una frase.\n- conceptos: hasta 8 ideas, técnicas o teorías, con su "dato".\n- temas: hasta 3 temas amplios a los que pertenece.\n` +
-        (known.length ? `Si algo ya existe en la wiki, usa EXACTAMENTE ese nombre: ${known.join(' · ')}\n` : '') +
-        `\nFUENTE: ${file.basename}\n${text}`,
-    });
+    const pedir = (extra = '') =>
+      this.chat({
+        tier: 'deep',
+        temperature: 0.2,
+        maxTokens: 1500,
+        schema,
+        label: 'Ingiriendo en la wiki',
+        system: `${this.systemPrompt()}\nMantienes una wiki personal. Extraes lo importante de una fuente con tus propias palabras, sin inventar nada que no esté en ella.`,
+        prompt:
+          `Analiza la fuente y devuelve:\n- titulo: título corto de la fuente.\n- resumen: una sola frase.\n- ideas: de 3 a 8 ideas clave, cada una una frase con datos concretos.\n- entidades: hasta 8 personas, lugares, herramientas, lenguajes, obras o empresas; "dato" = lo que dice la fuente sobre ella, en una frase.\n- conceptos: hasta 8 ideas, técnicas o teorías, con su "dato".\n- temas: hasta 3 temas amplios a los que pertenece.\n` +
+          (known.length ? `Si algo ya existe en la wiki, usa EXACTAMENTE ese nombre: ${known.join(' · ')}\n` : '') +
+          extra +
+          `\nFUENTE: ${file.basename}\n${text}`,
+      });
+    const vacia = (x) => !(x.entidades || []).some((e) => e?.nombre) && !(x.conceptos || []).some((e) => e?.nombre);
+    let r = await pedir();
+    // Los modelos chicos a veces dejan entidades y conceptos vacíos: sin ellos la wiki no crece, así que se pide una vez más
+    if (vacia(r) && text.length > 200) {
+      const otra = await pedir('IMPORTANTE: entidades y conceptos NO pueden quedar vacíos. Toda fuente nombra al menos una persona, herramienta, lugar o idea: escríbelas ahí, no solo en temas.\n');
+      if (!vacia(otra)) r = otra;
+    }
     const titulo = safeName(r.titulo || file.basename).slice(0, 90) || file.basename;
     const pageName = `Resumen - ${titulo}`;
     // Reingerir la misma fuente reemplaza su resumen anterior
@@ -5999,14 +6081,44 @@ module.exports = class RaizPlugin extends Plugin {
     if (m) label = label.slice(m[0].length);
     return ['```meta-bind-button', `id: ${id}`, `label: ${JSON.stringify(label)}`, ...(icon ? [`icon: ${icon}`] : []), `style: ${style}`, 'class: raiz-btn', 'hidden: true', 'actions:', actionYaml, '```'].join('\n');
   }
+  // Una línea por botón del bloque raiz-botones (ver renderBotones)
   mbCmd(id, label, cmd, style) {
-    return this.mbButton(id, label, `  - type: command\n    command: ${cmd}`, style);
+    return `${label} | comando: ${cmd}${style === 'default' ? ' | estilo: secundario' : ''}`;
   }
   mbOpen(id, label, path) {
-    return this.mbButton(id, label, `  - type: open\n    link: ${JSON.stringify(`[[${path}]]`)}\n    newTab: false`);
+    return `${label} | abrir: ${path}`;
   }
   buttonRow(defs) {
-    return '`BUTTON[' + defs.map((d) => d.id).join(', ') + ']`\n' + defs.map((d) => d.block).join('\n');
+    return '```raiz-botones\n' + defs.map((d) => d.block).join('\n') + '\n```';
+  }
+  /** Dibuja una fila de botones: abren una nota o ejecutan un comando. Sin IDs que registrar, así que no se pierden. */
+  renderBotones(src, el, ctx) {
+    const fila = el.createDiv({ cls: 'raiz-botones' });
+    for (const b of lineasBotones(src)) {
+      const boton = fila.createEl('button', { cls: `mb-button-inner raiz-btn${b.estilo === 'secundario' ? '' : ' mod-cta'}` });
+      if (b.icono) setIcon(boton.createSpan({ cls: 'raiz-btn-ic' }), b.icono);
+      boton.createSpan({ text: b.etiqueta });
+      boton.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (b.abrir) this.app.workspace.openLinkText(b.abrir.replace(/^\[\[|\]\]$/g, ''), ctx.sourcePath, e.ctrlKey || e.metaKey);
+        else if (!this.app.commands.executeCommandById(b.comando)) new Notice(`No encuentro el comando ${b.comando}.`);
+      });
+    }
+  }
+  /** Las notas que ya existían con botones de Meta Bind ocultos pasan al bloque propio (solo los que generó Raíz). */
+  async migrateButtons() {
+    let notas = 0;
+    for (const f of this.app.vault.getMarkdownFiles()) if (await this.migrateButtonsIn(f)) notas++;
+    if (notas) console.log(`[Raíz] Botones actualizados en ${notas} nota(s).`);
+    this.settings.botonesMigrados = true;
+    await this.saveSettings();
+    return notas;
+  }
+  async migrateButtonsIn(file) {
+    const t = await this.app.vault.cachedRead(file);
+    if (!t.includes('`BUTTON[') || !t.includes('class: raiz-btn') || !migrarBotones(t).cambios) return false;
+    await this.app.vault.process(file, (d) => migrarBotones(d).texto);
+    return true;
   }
   dvBlock(fn, args = '') {
     return '```dataviewjs\nif (window.raiz) await window.raiz.charts.' + fn + '(dv, this.container' + (args ? ', ' + args : '') + '); else dv.paragraph("Cargando Raíz…");\n```';
@@ -6877,6 +6989,26 @@ module.exports = class RaizPlugin extends Plugin {
     if (evt && evt.clientX !== undefined) m.showAtMouseEvent(evt);
     else m.showAtPosition({ x: window.innerWidth / 2, y: window.innerHeight / 3 });
   }
+  /** La plantilla puede tardar en llegar (con Obsidian ocupado, más de 15 s): se revisa a los 6 s y cada vez que la nota cambie durante su primer minuto. */
+  watchCursorTag(file) {
+    let espera = null;
+    const revisar = (ms) => {
+      clearTimeout(espera);
+      espera = setTimeout(() => this.cleanCursorTag(file).catch(() => {}), ms);
+    };
+    const ref = this.app.vault.on('modify', (f) => f === file && revisar(1500));
+    this.registerEvent(ref);
+    revisar(6000);
+    setTimeout(() => this.app.vault.offref(ref), 60000);
+  }
+  async cleanCursorTag(file) {
+    if (!(this.app.vault.getAbstractFileByPath(file.path) instanceof TFile)) return;
+    const enEditor = this.app.workspace.getLeavesOfType('markdown').some((l) => l.view.file === file && l.view.getMode() === 'source');
+    if (enEditor) return; // ahí Templater pone el cursor y la borra
+    const txt = await this.app.vault.read(file);
+    // se borra solo la marca: "- <% … %>" queda como "- ", igual que cuando Templater la quita en el editor
+    if (/<%\s*tp\.file\.cursor\(\d*\)\s*%>/.test(txt)) await this.app.vault.process(file, (d) => d.replace(/<%\s*tp\.file\.cursor\(\d*\)\s*%>/g, ''));
+  }
   /** Un enlace nuevo [[...]] escrito en una página crea su nota como subpágina, junto a ella. */
   async onLinkedNoteCreated(file) {
     if (!this.settings.autoSubpages || !(file instanceof TFile) || file.extension !== 'md') return;
@@ -6884,7 +7016,7 @@ module.exports = class RaizPlugin extends Plugin {
     const host = this.app.workspace.getActiveFile(); // la página donde se hizo clic (antes de que se abra la nueva)
     await new Promise((r) => setTimeout(r, 400));
     if ((await this.app.vault.read(file)).trim()) return; // ya tiene contenido (plantilla u otra cosa)
-    if (this.levelOf(file) || file.path.startsWith(this.settings.folders.inbox + '/')) return;
+    if (this.levelOf(file)) return; // las notas nuevas pueden nacer en la Bandeja: lo que decide es que esté vacía y enlazada desde una página
     if (!host || host === file || !this.isStudyPage(host)) return;
     const unresolved = this.app.metadataCache.unresolvedLinks[host.path] || {};
     const resolved = this.app.metadataCache.resolvedLinks[host.path] || {};

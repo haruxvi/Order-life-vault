@@ -29,7 +29,7 @@ const fs = require('fs');
 const path = require('path');
 
 const VERSION = '1.1.0';
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 const MAX_SALIDA = 6000; // caracteres por respuesta: el presupuesto duro
 const MAX_SECCION = 4000;
 const MAX_BYTES_NOTA = 400000;
@@ -192,7 +192,7 @@ function analizar(rel) {
     rel,
     bytes: st.size,
     mtime: st.mtimeMs,
-    fm: { tipo: uno(fm.tipo), clase: uno(fm.clase), resumen: uno(fm.resumen), revisado: uno(fm.revisado), tags: uno(fm.tags), resultado: uno(fm.resultado), correccion: uno(fm.correccion), actualizado: uno(fm.actualizado), fuentes: lista(fm.fuentes) },
+    fm: { tipo: uno(fm.tipo), clase: uno(fm.clase), padre: lista(fm.padre)[0] || '', resumen: uno(fm.resumen), revisado: uno(fm.revisado), tags: uno(fm.tags), resultado: uno(fm.resultado), correccion: uno(fm.correccion), actualizado: uno(fm.actualizado), fuentes: lista(fm.fuentes) },
     privada: esPrivada(fm),
     enlaces,
     secciones: [],
@@ -287,12 +287,40 @@ function cargarIndice() {
   if (cambios) STAMP++;
   return { notas, porNombre, cambios, stamp: STAMP };
 }
+/** Parecido entre lo que escribió el agente y una nota: palabras del nombre, de sus carpetas y de su resumen. */
+function parecidos(idx, ref, k = 5) {
+  const q = new Set(tokens(String(ref || '').replace(/\.md$/i, '')));
+  if (!q.size) return [];
+  const out = [];
+  for (const n of idx.notas) {
+    if (n.privada || n.fm.tipo === 'wiki-sistema') continue;
+    const nombre = new Set(tokens(path.basename(n.rel, '.md')));
+    const resto = new Set(tokens(`${path.dirname(n.rel)} ${n.fm.resumen}`));
+    let s = 0;
+    for (const t of q) s += nombre.has(t) ? 1 : resto.has(t) ? 0.5 : 0;
+    if (!s) continue;
+    // cubrir la consulta pesa más que el largo del nombre; un nombre que es justo lo pedido gana
+    const sc = s / q.size + (nombre.size ? [...nombre].filter((t) => q.has(t)).length / nombre.size : 0) * 0.5;
+    out.push({ n, sc });
+  }
+  return out.sort((a, b) => b.sc - a.sc).slice(0, k);
+}
 function buscarNota(idx, ref) {
   const r = String(ref || '').trim().replace(/^\[\[|\]\]$/g, '').replace(/\\/g, '/');
   const exacta = idx.notas.find((n) => n.rel === r || n.rel === r + '.md');
   if (exacta) return exacta;
-  return idx.porNombre.get(sinAcentos(path.basename(r, '.md'))) || null;
+  const porNombre = idx.porNombre.get(sinAcentos(path.basename(r, '.md')));
+  if (porNombre) return porNombre;
+  // Nombre aproximado (un agente suele adivinar: "rutina de empuje" → Rutinas/Empuje.md). Solo si no hay duda.
+  const p = parecidos(idx, r, 2);
+  if (p.length && p[0].sc >= 1.1 && (p.length < 2 || p[0].sc - p[1].sc >= 0.3)) return Object.assign(Object.create(Object.getPrototypeOf(p[0].n)), p[0].n, { aprox: r });
+  return null;
 }
+function noEncuentro(idx, ref) {
+  const p = parecidos(idx, ref);
+  return `No encuentro la nota "${ref}".${p.length ? ` Quizás quisiste decir:\n${p.map((x) => `- ${x.n.rel}${x.n.fm.resumen ? ` — ${x.n.fm.resumen}` : ''}`).join('\n')}` : ' Usa `buscar` para encontrarla.'}`;
+}
+const aviso = (n) => (n && n.aprox ? `(Interpreté "${n.aprox}" como ${n.rel}.)\n` : '');
 
 // ───────────── Medición honesta ─────────────
 function medir(herramienta, consulta, devueltos, completos, archivos) {
@@ -481,25 +509,44 @@ async function buscar(consulta, limite = 8, modo = 'auto') {
 function seccion(ref, titulo) {
   const idx = cargarIndice();
   const n = buscarNota(idx, ref);
-  if (!n) return `No encuentro la nota "${ref}".`;
+  if (!n) return noEncuentro(idx, ref);
   if (n.privada) return `"${n.rel}" es privada: no sale de la bóveda.`;
   if (!titulo) return esqueleto(ref);
   const t = sinAcentos(titulo);
   const s = n.secciones.find((x) => sinAcentos(x.titulo) === t) || n.secciones.find((x) => sinAcentos(x.titulo).endsWith(t)) || n.secciones.find((x) => sinAcentos(x.titulo).includes(t));
-  if (!s) return `"${n.rel}" no tiene una sección "${titulo}". Sus secciones:\n${n.secciones.map((x) => `- ${x.titulo} (línea ${x.linea})`).join('\n')}`;
-  const salida = recortar(`${n.rel}:${s.linea} · ${s.titulo}\n\n${s.texto}`, MAX_SECCION);
+  if (!s) return `${aviso(n)}"${n.rel}" no tiene una sección "${titulo}". ${n.secciones.length ? `Sus secciones:\n${n.secciones.map((x) => `- ${x.titulo} (línea ${x.linea})`).join('\n')}` : 'No tiene texto propio.'}\nPara ver qué notas contiene o enlaza, usa \`vecinos\` o \`explorar\`.`;
+  const salida = recortar(`${aviso(n)}${n.rel}:${s.linea} · ${s.titulo}\n\n${s.texto}`, MAX_SECCION);
   medir('seccion', `${n.rel} > ${titulo}`, salida.length, n.bytes, 1);
   return salida;
 }
 function esqueleto(ref) {
   const idx = cargarIndice();
   const n = buscarNota(idx, ref);
-  if (!n) return `No encuentro la nota "${ref}".`;
+  if (!n) return noEncuentro(idx, ref);
   if (n.privada) return `"${n.rel}" es privada: no sale de la bóveda.`;
   const fm = Object.entries(n.fm)
     .filter(([, v]) => v !== undefined && v !== '' && !(Array.isArray(v) && !v.length))
     .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
-  const L = [`${n.rel} (${n.bytes} bytes, ~${tok(n.bytes)} tokens si la abrieras entera)`, ...fm.map((x) => `  ${x}`), 'Secciones:', ...n.secciones.map((s) => `- ${s.titulo} (línea ${s.linea}, ${s.texto.length} caracteres)`)];
+  const L = [`${aviso(n)}${n.rel} (${n.bytes} bytes, ~${tok(n.bytes)} tokens si la abrieras entera)`, ...fm.map((x) => `  ${x}`), 'Secciones:', ...n.secciones.map((s) => `- ${s.titulo} (línea ${s.linea}, ${s.texto.length} caracteres)`)];
+  // Las páginas que cuelgan de esta (padre: [[esta]]) se ven en Obsidian con un bloque base, que es código y no se indexa
+  // Se muestran dos niveles, como un árbol de carpetas: área → colección → asignaturas
+  const porPadre = new Map();
+  for (const x of idx.notas) {
+    if (!x.fm.padre) continue;
+    const p = sinAcentos(x.fm.padre.split('/').pop());
+    if (!porPadre.has(p)) porPadre.set(p, []);
+    porPadre.get(p).push(x);
+  }
+  const base = (x) => path.basename(x.rel, '.md');
+  const hijas = (porPadre.get(sinAcentos(base(n))) || []).filter((x) => x.rel !== n.rel);
+  if (hijas.length) {
+    L.push(`Páginas dentro (${hijas.length}):`);
+    for (const h of hijas.slice(0, 30)) {
+      const nietas = (porPadre.get(sinAcentos(base(h))) || []).filter((x) => x.rel !== h.rel && x.rel !== n.rel);
+      L.push(`- ${base(h)}${h.fm.clase ? ` (${h.fm.clase})` : ''}${nietas.length ? `, contiene: ${nietas.slice(0, 12).map(base).join(', ')}${nietas.length > 12 ? `, … y ${nietas.length - 12} más` : ''}` : ''}`);
+    }
+    if (hijas.length > 30) L.push(`… y ${hijas.length - 30} más.`);
+  }
   if (n.enlaces.length) L.push(`Enlaza a ${n.enlaces.length} nota(s); usa \`vecinos\` para verlas con su resumen.`);
   const salida = recortar(L.join('\n'));
   medir('esqueleto', n.rel, salida.length, n.bytes, 1);
@@ -508,13 +555,13 @@ function esqueleto(ref) {
 function vecinos(ref, limite = 40) {
   const idx = cargarIndice();
   const n = buscarNota(idx, ref);
-  if (!n) return `No encuentro la nota "${ref}".`;
+  if (!n) return noEncuentro(idx, ref);
   if (n.privada) return `"${n.rel}" es privada: no sale de la bóveda.`;
   const nombre = sinAcentos(path.basename(n.rel, '.md'));
   const linea = (x, alt) => (x ? (x.privada ? `- ${path.basename(x.rel, '.md')} (privada)` : `- ${x.rel}${x.fm.resumen ? ` — ${x.fm.resumen}` : x.fm.clase ? ` (${x.fm.clase})` : ''}`) : `- ${alt} (no existe todavía)`);
   const salen = n.enlaces.slice(0, limite).map((e) => linea(idx.porNombre.get(sinAcentos(e)), e));
-  const entran = idx.notas.filter((x) => x !== n && x.enlaces.some((e) => sinAcentos(e) === nombre));
-  const L = [`Vecinos de ${n.rel}`, `Enlaza a (${n.enlaces.length}):`, ...salen, `La enlazan (${entran.length}):`, ...entran.slice(0, limite).map((x) => linea(x))];
+  const entran = idx.notas.filter((x) => x.rel !== n.rel && x.enlaces.some((e) => sinAcentos(e) === nombre));
+  const L = [`${aviso(n)}Vecinos de ${n.rel}`, `Enlaza a (${n.enlaces.length}):`, ...salen, `La enlazan (${entran.length}):`, ...entran.slice(0, limite).map((x) => linea(x))];
   if (entran.length > limite) L.push(`… y ${entran.length - limite} más.`);
   const salida = recortar(L.join('\n'));
   const vec = [...entran, ...n.enlaces.map((e) => idx.porNombre.get(sinAcentos(e))).filter(Boolean)];
@@ -541,7 +588,7 @@ function grafo(idx) {
 function explorar(ref, profundidad = 2) {
   const idx = cargarIndice();
   const n = buscarNota(idx, ref);
-  if (!n) return `No encuentro la nota "${ref}".`;
+  if (!n) return noEncuentro(idx, ref);
   if (n.privada) return `"${n.rel}" es privada: no sale de la bóveda.`;
   const ady = grafo(idx);
   const prof = Math.max(1, Math.min(Number(profundidad) || 2, 3));
@@ -561,7 +608,7 @@ function explorar(ref, profundidad = 2) {
     }
     frente = sig;
   }
-  const L = [`Alrededor de ${n.rel} (hasta ${prof} salto${prof > 1 ? 's' : ''}):`];
+  const L = [`${aviso(n)}Alrededor de ${n.rel} (hasta ${prof} salto${prof > 1 ? 's' : ''}):`];
   for (let d = 1; d <= prof; d++) {
     const anillo = [...visto.entries()].filter(([, x]) => x === d).map(([r]) => porRel.get(r)).filter((x) => x && !x.privada);
     if (!anillo.length) continue;
@@ -602,14 +649,14 @@ function camino(a, b) {
 // lo necesario y protegen lo tuyo: nada fuera de 13 Wiki, nada en Fuentes, y lo que revisaste (revisado: true) solo crece.
 const WIKI = '13 Wiki';
 const CARPETAS = { resumen: 'Resúmenes', entidad: 'Entidades', concepto: 'Conceptos', tema: 'Temas', respuesta: 'Respuestas' };
-const DE_RAIZ = new Set(['Índice.md', 'Revisión.md', 'Wiki.md', 'Lecciones.md'].map((n) => `${WIKI}/${n}`));
+const DE_RAIZ = new Set(['Índice.md', 'Registro.md', 'Revisión.md', 'Wiki.md', 'Lecciones.md'].map((n) => `${WIKI}/${n}`));
 const hoy = () => new Date().toISOString().slice(0, 10);
 function escribible(rel) {
   const abs = path.resolve(RAIZ, rel);
   const r = path.relative(RAIZ, abs).replace(/\\/g, '/');
   if (!r.startsWith(WIKI + '/') || r.includes('..')) throw new Error('Solo escribo dentro de 13 Wiki: el resto del vault es de la persona.');
   if (/^13 Wiki\/(Fuentes|Datos|Índices)\//.test(r)) throw new Error('Fuentes, Datos e Índices no se editan: las fuentes son de solo lectura y lo demás lo genera Raíz.');
-  if (DE_RAIZ.has(r)) throw new Error('Ese archivo lo genera Raíz. Para el registro usa `registrar`.');
+  if (DE_RAIZ.has(r)) throw new Error(r.endsWith('Registro.md') ? 'El Registro solo crece al final: usa `registrar`.' : 'Ese archivo lo genera Raíz. Para el registro usa `registrar`.');
   if (!r.toLowerCase().endsWith('.md')) throw new Error('Solo notas .md.');
   return { abs, rel: r };
 }
@@ -626,9 +673,9 @@ function respaldar(abs, rel) {
   }
   return true;
 }
-function guardar(abs, texto) {
+function guardar(abs, texto, eol = '\n') {
   const tmp = `${abs}.boveda-tmp`;
-  fs.writeFileSync(tmp, texto, 'utf8');
+  fs.writeFileSync(tmp, eol === '\r\n' ? texto.replace(/\r?\n/g, '\r\n') : texto, 'utf8');
   fs.renameSync(tmp, abs); // atómico: Obsidian nunca ve un archivo a medias
 }
 function conActualizado(txt) {
@@ -663,24 +710,28 @@ function ubicarSeccion(lineas, titulo) {
 function notaEscribible(ref) {
   const idx = cargarIndice();
   const n = buscarNota(idx, ref);
-  if (!n) throw new Error(`No encuentro "${ref}". Para una página nueva usa \`crear_pagina\`.`);
+  if (!n) throw new Error(`${noEncuentro(idx, ref)}\nPara una página nueva usa \`crear_pagina\`.`);
+  // Para escribir no se adivina: un nombre aproximado podría caer en otra página
+  if (n.aprox) throw new Error(`Para escribir necesito el nombre exacto. ¿Es ${n.rel}? Si es esa, vuelve a llamar con "${path.basename(n.rel, '.md')}".`);
   const { abs, rel } = escribible(n.rel);
-  return { n, abs, rel, txt: fs.readFileSync(abs, 'utf8') };
+  const crudo = fs.readFileSync(abs, 'utf8');
+  // Se trabaja en LF y se guarda con los finales de línea que tenía el archivo
+  return { n, abs, rel, txt: crudo.replace(/\r\n/g, '\n'), eol: /\r\n/.test(crudo) ? '\r\n' : '\n' };
 }
 function reemplazarSeccion(ref, titulo, texto) {
-  const { n, abs, rel, txt } = notaEscribible(ref);
+  const { n, abs, rel, txt, eol } = notaEscribible(ref);
   if (/^true$/i.test(n.fm.revisado)) return `"${rel}" la revisó la persona (revisado: true): no reemplazo su contenido. Usa \`agregar_a_seccion\` para sumar, por ejemplo bajo "Contradicciones".`;
   const lineas = txt.split(/\r?\n/);
   const s = ubicarSeccion(lineas, titulo);
   if (!s) return `"${rel}" no tiene la sección "${titulo}". Usa \`agregar_a_seccion\` para crearla.`;
   if (!respaldar(abs, rel)) return 'No pude guardar un respaldo, así que no modifiqué nada.';
   const nuevo = [...lineas.slice(0, s.inicio + 1), String(texto).replace(/\s+$/, ''), '', ...lineas.slice(s.fin)].join('\n');
-  guardar(abs, conActualizado(nuevo));
+  guardar(abs, conActualizado(nuevo), eol);
   medir('reemplazar_seccion', `${rel} > ${titulo}`, String(texto).length, txt.length, 1);
   return `Listo: reemplacé "${titulo}" en ${rel}. (Respaldo guardado.)`;
 }
 function agregarASeccion(ref, titulo, texto) {
-  const { abs, rel, txt } = notaEscribible(ref);
+  const { abs, rel, txt, eol } = notaEscribible(ref);
   const lineas = txt.split(/\r?\n/);
   const s = ubicarSeccion(lineas, titulo);
   if (!respaldar(abs, rel)) return 'No pude guardar un respaldo, así que no modifiqué nada.';
@@ -690,7 +741,7 @@ function agregarASeccion(ref, titulo, texto) {
     while (fin - 1 > s.inicio && !lineas[fin - 1].trim()) fin--;
     nuevo = [...lineas.slice(0, fin), String(texto).replace(/\s+$/, ''), ...(s.fin < lineas.length ? [''] : []), ...lineas.slice(s.fin)].join('\n');
   } else nuevo = `${txt.replace(/\s+$/, '')}\n\n## ${titulo.split('>').pop().trim()}\n${String(texto).replace(/\s+$/, '')}\n`;
-  guardar(abs, conActualizado(nuevo));
+  guardar(abs, conActualizado(nuevo), eol);
   medir('agregar_a_seccion', `${rel} > ${titulo}`, String(texto).length, txt.length, 1);
   return `Listo: agregué a "${titulo}" en ${rel}${s ? '' : ' (la sección no existía y la creé al final)'}.`;
 }
@@ -700,36 +751,56 @@ function crearPagina({ clase, titulo, resumen, fuentes, cuerpo }) {
   const nombre = String(titulo || '').replace(/[\\/:*?"<>|#^[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
   if (!nombre) return 'Falta el título.';
   const idx = cargarIndice();
-  const existe = buscarNota(idx, nombre);
+  let existe = buscarNota(idx, nombre);
+  if (existe && existe.aprox) existe = null; // solo cuenta el nombre exacto: "Qué es un árbol" no es "Árbol binario"
   if (existe) return `Ya existe "${existe.rel}". Agrega lo nuevo con \`agregar_a_seccion\` en vez de crear otra página.`;
   const { abs, rel } = escribible(`${WIKI}/${carpeta}/${nombre}.md`);
   const fs2 = (Array.isArray(fuentes) ? fuentes : fuentes ? String(fuentes).split(',') : []).map((f) => String(f).replace(/^\[\[|\]\]$/g, '').trim()).filter(Boolean);
   const fm = ['---', 'tipo: wiki', `clase: ${String(clase).toLowerCase()}`, `resumen: ${JSON.stringify(String(resumen || '').replace(/\s+/g, ' ').trim())}`, 'fuentes:', ...fs2.map((f) => `  - ${JSON.stringify(`[[${f}]]`)}`), `actualizado: ${hoy()}`, 'revisado: false', ...(String(clase).toLowerCase() === 'respuesta' ? ['resultado: ""'] : []), 'tags:', '  - wiki', '---'];
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  guardar(abs, `${fm.join('\n')}\n# ${nombre}\n\n${String(cuerpo || '').replace(/\s+$/, '')}\n`);
+  // El título ya lo pone la página: si el agente lo repitió al inicio del cuerpo, no se duplica
+  const texto = String(cuerpo || '').replace(/\r\n/g, '\n').replace(/^\s*#\s+(.+)\n+/, (m, t) => (sinAcentos(t.trim()) === sinAcentos(nombre) ? '' : m)).replace(/\s+$/, '');
+  guardar(abs, `${fm.join('\n')}\n# ${nombre}\n\n${texto}\n`);
   medir('crear_pagina', rel, String(cuerpo || '').length, String(cuerpo || '').length, 1);
-  return `Creada ${rel}. Recuerda anotarla con \`registrar\`.`;
+  // No bloquea (una página puede salir de lo que sabe el agente), pero avisa: cada dato debería llevar su fuente
+  const sinFuente = fs2.filter((f) => { const m = buscarNota(idx, f); return !m || m.aprox; });
+  const ojo = !fs2.length
+    ? ' Ojo: no citaste fuentes. Si los datos salen del vault, agrega en la página las notas que leíste (cada dato lleva su fuente).'
+    : sinFuente.length
+      ? ` Ojo: estas fuentes no existen en el vault: ${sinFuente.join(', ')}. Busca el nombre exacto con \`buscar\`.`
+      : '';
+  return `Creada ${rel}.${ojo} Recuerda anotarla con \`registrar\`.`;
 }
 function registrar({ tipo, titulo, paginas }) {
   const t = sinAcentos(String(tipo || '')).replace('revision', 'revisión');
   if (!['ingesta', 'consulta', 'revisión', 'edicion', 'edición'].includes(t)) return 'Tipo: ingesta, consulta, revisión o edición.';
   const abs = path.join(RAIZ, WIKI, 'Registro.md');
-  const lista = (Array.isArray(paginas) ? paginas : paginas ? String(paginas).split(',') : []).map((p) => `[[${String(p).replace(/^\[\[|\]\]$/g, '').trim()}]]`);
+  // Cada página se anota por su nombre real; las que no existen no se inventan en el Registro
+  const idx = cargarIndice();
+  const pedidas = (Array.isArray(paginas) ? paginas : paginas ? String(paginas).split(',') : []).map((p) => String(p).replace(/^\[\[|\]\]$/g, '').replace(/\.md$/i, '').trim()).filter(Boolean);
+  const faltan = [];
+  const lista = [];
+  for (const p of pedidas) {
+    const exacta = (x) => { const m = buscarNota(idx, x); return m && !m.aprox ? m : null; };
+    const n = exacta(p) || exacta(p.split(/[\/]/).pop());
+    if (n) lista.push(`[[${path.basename(n.rel, '.md')}]]`);
+    else faltan.push(p);
+  }
   const entrada = `\n## [${hoy()}] ${t.replace('edicion', 'edición')} | ${String(titulo || '').replace(/\n/g, ' ').slice(0, 120)}\n${lista.length ? `Páginas: ${lista.join(', ')}\n` : ''}`;
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.appendFileSync(abs, (fs.existsSync(abs) ? '' : '# Registro de la wiki\n') + entrada);
-  return 'Anotado en el Registro.';
+  return `Anotado en el Registro.${faltan.length ? ` No anoté ${faltan.map((p) => `"${p}"`).join(', ')}: no existe${faltan.length > 1 ? 'n' : ''} en el vault (usa el nombre de la página, sin carpeta).` : ''}`;
 }
 /** Cómo resultó una respuesta guardada: alimenta las lecciones para que no se repitan búsquedas inútiles. */
 function marcarResultado({ nota, resultado, correccion }) {
   const r = sinAcentos(String(resultado || '')).replace(/\s+/g, '_');
   if (!['util', 'sin_salida', 'corregida'].includes(r)) return 'Resultado: util, sin_salida o corregida.';
-  const { n, abs, rel, txt } = notaEscribible(nota);
+  const { n, abs, rel, txt, eol } = notaEscribible(nota);
   if (n.fm.clase !== 'respuesta') return 'Solo las páginas de Respuestas llevan resultado.';
   if (!respaldar(abs, rel)) return 'No pude guardar un respaldo, así que no modifiqué nada.';
   let nuevo = ponerPropiedad(txt, 'resultado', r);
   if (correccion) nuevo = ponerPropiedad(nuevo, 'correccion', String(correccion).slice(0, 300));
-  guardar(abs, conActualizado(nuevo));
+  guardar(abs, conActualizado(nuevo), eol);
   return `Marcada como ${r}.`;
 }
 
@@ -838,7 +909,7 @@ const HERRAMIENTAS = [
   { name: 'lecciones', ann: LECTURA, description: 'Lo aprendido en sesiones anteriores: fuentes que ya sirvieron, callejones sin salida y correcciones de la persona. Llámala AL EMPEZAR, antes de investigar.', inputSchema: { type: 'object', properties: {} }, run: () => lecciones() },
   { name: 'buscar', ann: LECTURA, description: 'Busca en todo el vault (por palabras y, si está disponible, por significado) y devuelve las secciones más relevantes con ruta:línea y un fragmento. Úsala ANTES de abrir notas: cuesta lo mismo con 100 o con 20.000 notas.', inputSchema: { type: 'object', properties: { consulta: texto('Palabras clave o pregunta'), limite: { type: 'number', description: 'Secciones a devolver (1-20, por defecto 8)' } }, required: ['consulta'] }, run: (a) => buscar(a.consulta, a.limite) },
   { name: 'seccion', ann: LECTURA, description: 'Lee una sola sección de una nota (por su título), no la nota entera. Sin título devuelve el esqueleto.', inputSchema: { type: 'object', properties: { nota: texto('Ruta o nombre de la nota'), titulo: texto('Título de la sección (basta una parte)') }, required: ['nota'] }, run: (a) => seccion(a.nota, a.titulo) },
-  { name: 'esqueleto', ann: LECTURA, description: 'Resumen, propiedades y lista de secciones de una nota, sin el contenido. Para decidir qué sección leer.', inputSchema: { type: 'object', properties: { nota: texto('Ruta o nombre') }, required: ['nota'] }, run: (a) => esqueleto(a.nota) },
+  { name: 'esqueleto', ann: LECTURA, description: 'Resumen, propiedades, lista de secciones y páginas que están dentro de una nota (sus hijas), sin el contenido. Para decidir qué leer.', inputSchema: { type: 'object', properties: { nota: texto('Ruta o nombre') }, required: ['nota'] }, run: (a) => esqueleto(a.nota) },
   { name: 'vecinos', ann: LECTURA, description: 'Las notas que una nota enlaza y las que la enlazan, cada una con su resumen de una línea.', inputSchema: { type: 'object', properties: { nota: texto('Ruta o nombre'), limite: { type: 'number' } }, required: ['nota'] }, run: (a) => vecinos(a.nota, a.limite) },
   { name: 'explorar', ann: LECTURA, description: 'El vecindario de una nota hasta 3 saltos, con resúmenes y lo más conectado primero, dentro de un presupuesto fijo. Para entender un tema sin abrir notas.', inputSchema: { type: 'object', properties: { nota: texto('Ruta o nombre'), profundidad: { type: 'number', description: '1 a 3 (por defecto 2)' } }, required: ['nota'] }, run: (a) => explorar(a.nota, a.profundidad) },
   { name: 'camino', ann: LECTURA, description: 'Cómo se conectan dos notas: el camino más corto de enlaces entre ellas.', inputSchema: { type: 'object', properties: { desde: texto('Nota de inicio'), hasta: texto('Nota de destino') }, required: ['desde', 'hasta'] }, run: (a) => camino(a.desde, a.hasta) },
@@ -852,7 +923,7 @@ const HERRAMIENTAS = [
 ];
 const INSTRUCCIONES =
   'Bóveda de Obsidian de una persona (vida personal, estudio y entrenamiento), en español. Para ahorrar tokens: ' +
-  '1) al empezar, `lecciones`; 2) `buscar` antes de abrir cualquier nota; 3) lee solo la `seccion` que necesitas; 4) recorre el grafo con `vecinos`, `explorar` o `camino`; ' +
+  '1) al empezar, `lecciones`; 2) `buscar` antes de abrir cualquier nota; 3) lee solo la `seccion` que necesitas; 4) recorre el grafo con `vecinos`, `explorar` o `camino` (las páginas de estudio cuelgan unas de otras: `esqueleto` muestra las que están dentro); ' +
   '5) para datos personales, `datos`; 6) para escribir en la wiki usa `crear_pagina`, `agregar_a_seccion` y `reemplazar_seccion`, nunca reescribas una página entera. Reglas completas en AGENTS.md.';
 function servidorMcp() {
   const enviar = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');

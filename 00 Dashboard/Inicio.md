@@ -16,50 +16,11 @@ banner-radius: 25
 if (window.raiz) await window.raiz.charts.hub(dv, this.container); else dv.paragraph("Cargando…");
 ```
 
-`BUTTON[raiz-captura, raiz-pagina, raiz-evento, raiz-espacio]`
-```meta-bind-button
-id: raiz-captura
-label: "Capturar"
-icon: inbox
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:capture
-```
-```meta-bind-button
-id: raiz-pagina
-label: "Página de estudio"
-icon: book-open
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:new-study-page
-```
-```meta-bind-button
-id: raiz-evento
-label: "Evento"
-icon: calendar-plus
-style: default
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:new-event
-```
-```meta-bind-button
-id: raiz-espacio
-label: "Preparar mi espacio"
-icon: layout-panel-left
-style: default
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:prepare-workspace
+```raiz-botones
+Capturar | comando: raiz:capture | icono: inbox
+Página de estudio | comando: raiz:new-study-page | icono: book-open
+Evento | comando: raiz:new-event | icono: calendar-plus | estilo: secundario
+Preparar mi espacio | comando: raiz:prepare-workspace | icono: layout-panel-left | estilo: secundario
 ```
 
 ## Hoy

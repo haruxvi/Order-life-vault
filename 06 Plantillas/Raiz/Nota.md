@@ -16,28 +16,9 @@ if (window.raiz) await window.raiz.charts.pageHeader(dv, this.container); else d
 ```
 **Mapa:** {{mapa}} · **Fuente:** {{fuente}}
 **En una frase:** `INPUT[text(placeholder(La idea en una línea…)):resumen]`
-`BUTTON[raiz-cards, raiz-conn]`
-```meta-bind-button
-id: raiz-cards
-label: "Generar preguntas"
-icon: layers
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:generate-cards
-```
-```meta-bind-button
-id: raiz-conn
-label: "Conexiones"
-icon: link
-style: default
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:open-connections
+```raiz-botones
+Generar preguntas | comando: raiz:generate-cards | icono: layers
+Conexiones | comando: raiz:open-connections | icono: link | estilo: secundario
 ```
 
 ## La idea

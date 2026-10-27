@@ -11,7 +11,7 @@ Mientras más crece el vault, más caro sale leer notas completas. Usa la herram
 |---|---|---|
 | Lo aprendido en sesiones anteriores (**al empezar**) | `lecciones` | `node .obsidian/plugins/raiz/boveda.js lecciones` |
 | Encontrar algo (por palabras y por significado) | `buscar` | `… boveda.js buscar "consulta"` |
-| Ver de qué trata una nota y sus secciones | `esqueleto` | `… boveda.js esqueleto "Nota"` |
+| Ver de qué trata una nota, sus secciones y las páginas que tiene dentro | `esqueleto` | `… boveda.js esqueleto "Nota"` |
 | Leer solo una parte de una nota | `seccion` | `… boveda.js seccion "Nota" "Título"` |
 | Enlaces de una nota y quién la enlaza | `vecinos` | `… boveda.js vecinos "Nota"` |
 | El vecindario de un tema, hasta 3 saltos | `explorar` | `… boveda.js explorar "Nota" --profundidad 2` |
@@ -45,7 +45,7 @@ Reglas de presupuesto:
 
 **Privacidad:** las notas con `privado: true` (o la etiqueta `privado`) no salen por la herramienta. No las abras por tu cuenta.
 
-No leas: `.obsidian/`, `.trash/`, `06 Plantillas/`, `11 Biblioteca/_portadas/` ni imágenes. Los bloques ```` ```dataviewjs ````, ```` ```base ```` y ```` ```meta-bind ```` son código que dibuja paneles: no tienen contenido, sáltalos.
+No leas: `.obsidian/`, `.trash/`, `06 Plantillas/`, `11 Biblioteca/_portadas/` ni imágenes. Los bloques ```` ```dataviewjs ````, ```` ```base ````, ```` ```meta-bind ```` y ```` ```raiz-botones ```` son código que dibuja paneles y botones: no tienen contenido, sáltalos.
 
 ## Qué puedes tocar
 | Carpeta | Para ti |

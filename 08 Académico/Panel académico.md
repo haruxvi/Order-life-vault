@@ -11,18 +11,10 @@ tipo: panel
 semestre: 
 ---
 # Panel académico
-**Semestre** `INPUT[text(placeholder(vacío = el más reciente)):semestre]` · `BUTTON[raiz-asignatura]`
-```meta-bind-button
-id: raiz-asignatura
-label: "Nueva asignatura"
-icon: plus
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:new-course
+```raiz-botones
+Nueva asignatura | comando: raiz:new-course | icono: plus
 ```
+**Semestre** `INPUT[text(placeholder(vacío = el más reciente)):semestre]` ·
 
 ```dataviewjs
 if (window.raiz) await window.raiz.charts.academicDashboard(dv, this.container); else dv.paragraph("Cargando Raíz…");

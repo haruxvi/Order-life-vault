@@ -10,17 +10,8 @@ banner-radius: 25
 tipo: panel
 ---
 # Agenda
-`BUTTON[raiz-evento]`
-```meta-bind-button
-id: raiz-evento
-label: "Nuevo evento o reunión"
-icon: plus
-style: primary
-class: raiz-btn
-hidden: true
-actions:
-  - type: command
-    command: raiz:new-event
+```raiz-botones
+Nuevo evento o reunión | comando: raiz:new-event | icono: plus
 ```
 
 ## Próximos 60 días

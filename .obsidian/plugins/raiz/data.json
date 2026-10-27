@@ -345,6 +345,8 @@
     "dashboard": "00 Dashboard",
     "covers": "06 Plantillas/Portadas",
     "knowledge": "12 Conocimiento",
+    "wiki": "13 Wiki",
     "inbox": "00 Bandeja"
-  }
+  },
+  "botonesMigrados": true
 }
