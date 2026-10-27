@@ -346,6 +346,8 @@
     "covers": "06 Plantillas/Portadas",
     "knowledge": "12 Conocimiento",
     "wiki": "13 Wiki",
+    "projects": "14 Proyectos",
+    "agents": "15 Agentes",
     "inbox": "00 Bandeja"
   },
   "botonesMigrados": true

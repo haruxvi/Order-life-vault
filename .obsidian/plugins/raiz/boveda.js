@@ -20,7 +20,9 @@
  *   node .obsidian/plugins/raiz/boveda.js vecinos "C++"
  *   node .obsidian/plugins/raiz/boveda.js datos --desde 2026-10-01 --columnas sueno,peso
  *   node .obsidian/plugins/raiz/boveda.js medicion
- *   node .obsidian/plugins/raiz/boveda.js mcp          (servidor MCP por stdio)
+ *   node .obsidian/plugins/raiz/boveda.js memoria contexto "tarea" --proyecto "Mi app"
+ *   node .obsidian/plugins/raiz/boveda.js ejecucion iniciar "meta" --tope 10 --plazo 07:40
+ *   node .obsidian/plugins/raiz/boveda.js mcp [--perfil vault|proyectos|agente|orquestador|todo]   (servidor MCP por stdio)
  *
  * Sin dependencias: solo Node.js 18 o superior.
  */
@@ -28,8 +30,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const VERSION = '1.1.0';
-const CACHE_VERSION = 5;
+const VERSION = '1.2.0';
+const CACHE_VERSION = 6;
 const MAX_SALIDA = 6000; // caracteres por respuesta: el presupuesto duro
 const MAX_SECCION = 4000;
 const MAX_BYTES_NOTA = 400000;
@@ -192,7 +194,7 @@ function analizar(rel) {
     rel,
     bytes: st.size,
     mtime: st.mtimeMs,
-    fm: { tipo: uno(fm.tipo), clase: uno(fm.clase), padre: lista(fm.padre)[0] || '', resumen: uno(fm.resumen), revisado: uno(fm.revisado), tags: uno(fm.tags), resultado: uno(fm.resultado), correccion: uno(fm.correccion), actualizado: uno(fm.actualizado), fuentes: lista(fm.fuentes) },
+    fm: { tipo: uno(fm.tipo), clase: uno(fm.clase), padre: lista(fm.padre)[0] || '', estado: uno(fm.estado), meta: uno(fm.meta), proyecto: lista(fm.proyecto)[0] || '', repo: uno(fm.repo), stack: uno(fm.stack), inicio: uno(fm.inicio), gasto_usd: uno(fm.gasto_usd), resumen: uno(fm.resumen), revisado: uno(fm.revisado), tags: uno(fm.tags), resultado: uno(fm.resultado), correccion: uno(fm.correccion), actualizado: uno(fm.actualizado), fuentes: lista(fm.fuentes) },
     privada: esPrivada(fm),
     enlaces,
     secciones: [],
@@ -644,7 +646,7 @@ function camino(a, b) {
   return salida;
 }
 
-// ───────────── Escribir por secciones (solo en 13 Wiki, con respaldo) ─────────────
+// ───────────── Escribir por secciones (solo en 13 Wiki y 14 Proyectos, con respaldo) ─────────────
 // Reescribir una página entera para cambiar una línea cuesta muchos tokens de salida. Estas herramientas cambian solo
 // lo necesario y protegen lo tuyo: nada fuera de 13 Wiki, nada en Fuentes, y lo que revisaste (revisado: true) solo crece.
 const WIKI = '13 Wiki';
@@ -654,7 +656,8 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 function escribible(rel) {
   const abs = path.resolve(RAIZ, rel);
   const r = path.relative(RAIZ, abs).replace(/\\/g, '/');
-  if (!r.startsWith(WIKI + '/') || r.includes('..')) throw new Error('Solo escribo dentro de 13 Wiki: el resto del vault es de la persona.');
+  if (!(r.startsWith(WIKI + '/') || r.startsWith(PROYECTOS + '/')) || r.includes('..')) throw new Error('Solo escribo dentro de 13 Wiki y 14 Proyectos: el resto del vault es de la persona.');
+  if (r === `${PROYECTOS}/Proyectos.md`) throw new Error('Proyectos.md es el panel: escribe en la nota de cada proyecto.');
   if (/^13 Wiki\/(Fuentes|Datos|Índices)\//.test(r)) throw new Error('Fuentes, Datos e Índices no se editan: las fuentes son de solo lectura y lo demás lo genera Raíz.');
   if (DE_RAIZ.has(r)) throw new Error(r.endsWith('Registro.md') ? 'El Registro solo crece al final: usa `registrar`.' : 'Ese archivo lo genera Raíz. Para el registro usa `registrar`.');
   if (!r.toLowerCase().endsWith('.md')) throw new Error('Solo notas .md.');
@@ -901,6 +904,532 @@ function estado() {
   return `Bóveda en ${RAIZ}\n${idx.notas.length} notas (${privadas} privadas) · ${idx.notas.reduce((a, n) => a + n.secciones.length, 0)} secciones · ~${tok(bytes)} tokens si se leyera todo.\nÍndice al día en ${Date.now() - t0} ms (${idx.cambios} nota(s) reprocesadas).`;
 }
 
+// ───────────── Proyectos y orquestación: memoria persistente para agentes ─────────────
+// El vault guarda qué pasó en cada ejecución, lo que vale la pena recordar y el estado de cada proyecto, y cada agente
+// recibe solo el contexto que le sirve, con un tope de tokens.
+//  - 14 Proyectos/<Proyecto>.md: contexto, estado actual, pendientes y decisiones de un proyecto (tuyo y de tus agentes).
+//  - 15 Agentes/Registros/<id>.jsonl: una línea por evento y solo se agrega, así que varios agentes pueden anotar a la vez.
+//  - 15 Agentes/Ejecuciones/<id>.md: el resumen de cada ejecución. Lo lees tú en Obsidian y lo encuentra `buscar`.
+//  - 15 Agentes/Memoria/memoria.jsonl: recuerdos breves y reutilizables, de un proyecto o generales.
+//    Nada se reescribe: se refuerza o se marca como olvidado.
+const PROYECTOS = '14 Proyectos';
+const AGENTES = '15 Agentes';
+const TIPOS_EVENTO = ['tool_call', 'decision', 'error', 'artefacto', 'nota', 'agente'];
+const TIPOS_MEMORIA = ['hecho', 'decision', 'error', 'preferencia', 'procedimiento'];
+const ESTADOS_FIN = ['hecha', 'fallida', 'cancelada', 'detenida'];
+const rutaAg = (...p) => path.join(RAIZ, AGENTES, ...p);
+const corto = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+const usd = (x) => `$${Number((Number(x) || 0).toFixed(4))}`;
+const numero = (x) => (Number.isFinite(Number(x)) && Number(x) >= 0 ? Number(x) : undefined);
+const listaDe = (v) => (Array.isArray(v) ? v : v ? String(v).split(',') : []).map((x) => corto(x, 60)).filter(Boolean);
+const dos = (n) => String(n).padStart(2, '0');
+const local = (d) => `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}T${dos(d.getHours())}:${dos(d.getMinutes())}`;
+function leerJsonl(abs) {
+  let txt = '';
+  try {
+    txt = fs.readFileSync(abs, 'utf8');
+  } catch (e) {
+    return [];
+  }
+  const out = [];
+  for (const l of txt.split('\n')) {
+    if (!l.trim()) continue;
+    try {
+      out.push(JSON.parse(l));
+    } catch (e) {
+      /* una línea a medias o de otro programa no tumba la lectura */
+    }
+  }
+  return out;
+}
+function anexar(abs, obj) {
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.appendFileSync(abs, JSON.stringify(obj) + '\n'); // una sola escritura por línea: varios procesos pueden anotar a la vez
+}
+function idEjecucion(id) {
+  const s = String(id || '').trim();
+  if (!/^\d{8}-\d{6}-[a-z0-9-]{0,48}$/.test(s)) throw new Error(`"${s}" no es un id de ejecución. Se ven así: 20261027-235100-producto-que-la-gente-paga (usa ejecucion lista).`);
+  return s;
+}
+/** "07:40" es la próxima vez que el reloj marque esa hora; también sirve una fecha y hora completa. */
+function plazoDe(plazo, desde) {
+  if (!plazo) return null;
+  const m = String(plazo).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (m) {
+    const d = new Date(desde);
+    d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    if (d <= desde) d.setDate(d.getDate() + 1);
+    return d.toISOString();
+  }
+  const t = Date.parse(plazo);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+// Totales de una ejecución. En el servidor MCP se leen solo los bytes nuevos: anotar un evento no relee todo el registro.
+const nuevoResumen = () => ({ inicio: null, fin: null, n: 0, gasto: 0, tin: 0, tout: 0, llamadas: 0, errores: 0, agentes: new Map() });
+function acumular(r, e) {
+  if (e.tipo === 'inicio') return void (r.inicio = e);
+  if (e.tipo === 'fin') return void (r.fin = e);
+  r.n++;
+  r.gasto += Number(e.costo_usd) || 0;
+  r.tin += Number(e.tokens_entrada) || 0;
+  r.tout += Number(e.tokens_salida) || 0;
+  if (e.tipo === 'tool_call') r.llamadas++;
+  if (e.tipo === 'error') r.errores++;
+  const a = r.agentes.get(e.agente) || { n: 0, gasto: 0, tin: 0, tout: 0, errores: 0, ultimo: null };
+  a.n++;
+  a.gasto += Number(e.costo_usd) || 0;
+  a.tin += Number(e.tokens_entrada) || 0;
+  a.tout += Number(e.tokens_salida) || 0;
+  if (e.tipo === 'error') a.errores++;
+  a.ultimo = e;
+  r.agentes.set(e.agente, a);
+}
+const EJECUCIONES = new Map();
+function estadoEjecucion(id) {
+  const abs = rutaAg('Registros', `${id}.jsonl`);
+  let st;
+  try {
+    st = fs.statSync(abs);
+  } catch (e) {
+    throw new Error(`No existe la ejecución ${id}. Créala con ejecucion iniciar o busca su id con ejecucion lista.`);
+  }
+  let s = EJECUCIONES.get(id);
+  if (!s || st.size < s.bytes) s = { bytes: 0, r: nuevoResumen(), recientes: [] };
+  if (st.size > s.bytes) {
+    const fd = fs.openSync(abs, 'r');
+    const buf = Buffer.alloc(st.size - s.bytes);
+    fs.readSync(fd, buf, 0, buf.length, s.bytes);
+    fs.closeSync(fd);
+    const txt = buf.toString('utf8');
+    const fin = txt.lastIndexOf('\n'); // una línea que otro agente está escribiendo se lee en la próxima vuelta
+    for (const l of txt.slice(0, fin + 1).split('\n')) {
+      if (!l.trim()) continue;
+      try {
+        const e = JSON.parse(l);
+        acumular(s.r, e);
+        if (e.tipo !== 'inicio' && e.tipo !== 'fin') s.recientes = s.recientes.concat(e).slice(-6);
+      } catch (e) {
+        /* línea ajena */
+      }
+    }
+    s.bytes += Buffer.byteLength(txt.slice(0, fin + 1));
+  }
+  EJECUCIONES.set(id, s);
+  return s;
+}
+/** El guardián del presupuesto: la respuesta a cada evento dice si se puede seguir. */
+function guardia(r) {
+  const tope = Number(r.inicio?.tope_usd) || 0;
+  const plazo = r.inicio?.plazo ? Date.parse(r.inicio.plazo) : 0;
+  if (tope && r.gasto >= tope) return `DETENER: se alcanzó el tope de gasto (${usd(r.gasto)} de ${usd(tope)}). Cierra con ejecucion cerrar.`;
+  if (plazo && Date.now() > plazo) return `DETENER: pasó el plazo (${r.inicio.plazo_texto || r.inicio.plazo}). Cierra con ejecucion cerrar.`;
+  const base = `ok · ${r.n} evento(s) · ${usd(r.gasto)}${tope ? ` de ${usd(tope)}` : ''}`;
+  return tope && r.gasto >= tope * 0.8 ? `${base} · ojo: ${Math.round((r.gasto / tope) * 100)} % del tope` : base;
+}
+function notaEjecucion(id, r, extra = {}) {
+  const ini = r.inicio || {};
+  const fm = [
+    '---',
+    'tipo: ejecucion',
+    `estado: ${extra.estado || 'en curso'}`,
+    `meta: ${JSON.stringify(ini.meta || '')}`,
+    `id: ${id}`,
+    ...(ini.proyecto ? [`proyecto: ${JSON.stringify(`[[${ini.proyecto}]]`)}`] : []),
+    `inicio: ${ini.ts ? local(new Date(ini.ts)) : ''}`,
+    `fin: ${extra.fin || ''}`,
+    `tope_usd: ${ini.tope_usd ?? ''}`,
+    `plazo: ${ini.plazo ? local(new Date(ini.plazo)) : ''}`,
+    `gasto_usd: ${Number(r.gasto.toFixed(4))}`,
+    `eventos: ${r.n}`,
+    `tokens_entrada: ${r.tin}`,
+    `tokens_salida: ${r.tout}`,
+    'agentes:',
+    ...[...new Set([...(ini.agentes || []), ...r.agentes.keys()])].map((a) => `  - ${JSON.stringify(a)}`),
+    `resumen: ${JSON.stringify(corto(extra.resumen || '', 200))}`,
+    'tags:',
+    '  - ejecucion',
+    '---',
+  ];
+  return `${fm.join('\n')}\n# ${corto(ini.meta || id, 120)}\n> Ejecución \`${id}\` · registro completo en \`${AGENTES}/Registros/${id}.jsonl\`\n\n${extra.cuerpo || 'En curso: este resumen se completa al cerrarla.'}\n`;
+}
+async function iniciarEjecucion({ meta, tope_usd, plazo, agentes, proyecto, presupuesto_tokens }) {
+  const m = corto(meta, 300);
+  if (!m) return 'Falta la meta de la ejecución.';
+  const p = proyecto ? buscarProyecto(cargarIndice(), proyecto) : null;
+  if (proyecto && !p) return `No existe el proyecto "${proyecto}". ${listaProyectos()}\nCréalo con proyecto crear o inicia sin proyecto.`;
+  const ahora = new Date();
+  const slug = sinAcentos(m).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+  const base = `${ahora.getFullYear()}${dos(ahora.getMonth() + 1)}${dos(ahora.getDate())}-${dos(ahora.getHours())}${dos(ahora.getMinutes())}${dos(ahora.getSeconds())}-${slug}`;
+  let id = base;
+  for (let i = 2; fs.existsSync(rutaAg('Registros', `${id}.jsonl`)); i++) id = `${base}-${i}`;
+  const tope = numero(tope_usd);
+  const inicio = { ts: ahora.toISOString(), tipo: 'inicio', meta: m, tope_usd: tope ?? null, plazo: plazoDe(plazo, ahora), plazo_texto: plazo ? corto(plazo, 40) : null, agentes: listaDe(agentes), proyecto: p ? path.basename(p.rel, '.md') : undefined };
+  anexar(rutaAg('Registros', `${id}.jsonl`), inicio);
+  const r = nuevoResumen();
+  r.inicio = inicio;
+  fs.mkdirSync(rutaAg('Ejecuciones'), { recursive: true });
+  guardar(rutaAg('Ejecuciones', `${id}.md`), notaEjecucion(id, r));
+  const previo = await contexto({ consulta: m, alcance: 'todo', proyecto: inicio.proyecto, presupuesto_tokens: presupuesto_tokens || 600 });
+  return `Ejecución ${id} iniciada${tope ? ` · tope ${usd(tope)}` : ''}${inicio.plazo ? ` · plazo ${local(new Date(inicio.plazo))}` : ''}.\nAnota cada paso con ejecucion evento (la respuesta dice si hay que DETENER) y ciérrala con ejecucion cerrar.\n\n${previo}`;
+}
+function eventoEjecucion({ ejecucion, agente, tipo, texto, costo_usd, tokens_entrada, tokens_salida, ms, estado }) {
+  const id = idEjecucion(ejecucion);
+  const s = estadoEjecucion(id);
+  if (s.r.fin) return `La ejecución ${id} ya terminó (${s.r.fin.estado}): no anoto más eventos.`;
+  const t = sinAcentos(tipo || 'nota');
+  if (!TIPOS_EVENTO.includes(t)) return `Tipo de evento: ${TIPOS_EVENTO.join(', ')}.`;
+  const e = { ts: new Date().toISOString(), agente: corto(agente, 40) || 'sin nombre', tipo: t, texto: corto(texto, 1000) };
+  for (const [k, v] of Object.entries({ costo_usd, tokens_entrada, tokens_salida, ms })) if (numero(v) !== undefined) e[k] = numero(v);
+  if (t === 'agente') e.estado = corto(estado || 'running', 20);
+  anexar(rutaAg('Registros', `${id}.jsonl`), e);
+  return guardia(estadoEjecucion(id).r); // incluye lo que anotaron los demás agentes mientras tanto
+}
+function verEjecucion({ ejecucion }) {
+  const id = idEjecucion(ejecucion);
+  const { r, recientes } = estadoEjecucion(id);
+  const ini = r.inicio || {};
+  const L = [
+    `${ini.meta || id} · ${r.fin ? `cerrada (${r.fin.estado})` : 'en curso'}`,
+    `${r.n} evento(s) · ${r.llamadas} llamada(s) a herramientas · ${r.errores} error(es) · ${usd(r.gasto)}${ini.tope_usd ? ` de ${usd(ini.tope_usd)}` : ''} · tokens ${r.tin}/${r.tout}`,
+  ];
+  if (ini.plazo && !r.fin) {
+    const min = Math.round((Date.parse(ini.plazo) - Date.now()) / 60000);
+    L.push(min >= 0 ? `Quedan ${Math.floor(min / 60)} h ${min % 60} min para el plazo.` : 'Pasó el plazo.');
+  }
+  if (r.agentes.size) L.push('Agentes:', ...[...r.agentes.entries()].map(([a, x]) => `- ${a}: ${x.n} evento(s), ${usd(x.gasto)}${x.errores ? `, ${x.errores} error(es)` : ''} · último: ${x.ultimo.tipo === 'agente' ? x.ultimo.estado : x.ultimo.tipo}`));
+  if (recientes.length) L.push('Últimos eventos:', ...recientes.map((e) => `- ${e.ts.slice(11, 19)} [${e.agente}] ${e.tipo}: ${corto(e.texto, 120)}`));
+  if (!r.fin) L.push(guardia(r));
+  return recortar(L.join('\n'), 2500);
+}
+function cerrarEjecucion({ ejecucion, estado, resumen, resultado }) {
+  const id = idEjecucion(ejecucion);
+  const s = estadoEjecucion(id);
+  if (s.r.fin) return `La ejecución ${id} ya estaba cerrada (${s.r.fin.estado}).`;
+  const est = ESTADOS_FIN.includes(sinAcentos(estado)) ? sinAcentos(estado) : 'hecha';
+  const ahora = new Date();
+  anexar(rutaAg('Registros', `${id}.jsonl`), { ts: ahora.toISOString(), tipo: 'fin', estado: est, resumen: corto(resumen, 2000), resultado: corto(resultado, 500) });
+  // El registro completo se lee una sola vez, al cerrar, para dejar un resumen que cualquiera puede leer barato
+  const eventos = leerJsonl(rutaAg('Registros', `${id}.jsonl`));
+  const r = nuevoResumen();
+  for (const e of eventos) acumular(r, e);
+  const de = (t, n = 15) => eventos.filter((e) => e.tipo === t).slice(-n).map((e) => `- [${e.agente}] ${corto(e.texto, 300)}`);
+  const ini = r.inicio || {};
+  const min = ini.ts ? Math.round((ahora - Date.parse(ini.ts)) / 60000) : 0;
+  const cuerpo = [
+    `**${est}** · ${min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`} · ${r.n} eventos · ${usd(r.gasto)}${ini.tope_usd ? ` de ${usd(ini.tope_usd)}` : ''} · tokens ${r.tin}/${r.tout}`,
+    '',
+    '## Resumen',
+    corto(resumen, 2000) || '(sin resumen)',
+    ...(resultado ? ['', '## Resultado', corto(resultado, 500)] : []),
+    ...[['Decisiones', 'decision'], ['Errores', 'error'], ['Artefactos', 'artefacto']].flatMap(([titulo, t]) => (de(t).length ? ['', `## ${titulo}`, ...de(t)] : [])),
+    ...(r.agentes.size ? ['', '## Agentes', '| Agente | Eventos | Gasto | Tokens entrada/salida | Errores |', '|---|---|---|---|---|', ...[...r.agentes.entries()].map(([a, x]) => `| ${a} | ${x.n} | ${usd(x.gasto)} | ${x.tin}/${x.tout} | ${x.errores} |`)] : []),
+  ].join('\n');
+  guardar(rutaAg('Ejecuciones', `${id}.md`), notaEjecucion(id, r, { estado: est, fin: local(ahora), resumen, cuerpo }));
+  EJECUCIONES.delete(id);
+  return `Ejecución ${id} cerrada (${est}) · ${r.n} eventos · ${usd(r.gasto)}. Resumen en ${AGENTES}/Ejecuciones/${id}.md. Si aprendiste algo que sirva la próxima vez, guárdalo con memoria guardar.`;
+}
+function listaEjecuciones({ limite } = {}) {
+  let archivos = [];
+  try {
+    archivos = fs.readdirSync(rutaAg('Ejecuciones')).filter((f) => /^\d{8}-\d{6}-.*\.md$/.test(f)).sort().reverse();
+  } catch (e) {
+    return 'Todavía no hay ejecuciones.';
+  }
+  const n = Math.min(30, Math.max(1, Number(limite) || 10));
+  const L = archivos.slice(0, n).map((f) => {
+    const { fm } = frontmatter(fs.readFileSync(rutaAg('Ejecuciones', f), 'utf8'));
+    const v = (k) => (Array.isArray(fm[k]) ? fm[k].join(', ') : fm[k] || '');
+    return `- ${f.slice(0, -3)} · ${v('estado')} · ${usd(v('gasto_usd'))} · ${v('meta')}`;
+  });
+  return L.length ? `${archivos.length} ejecución(es); las más recientes:\n${L.join('\n')}` : 'Todavía no hay ejecuciones.';
+}
+
+// Memoria: cada recuerdo es una o dos frases. El agente recibe los que tocan su tarea, nunca el archivo entero.
+const MEMORIA = () => rutaAg('Memoria', 'memoria.jsonl');
+let MEMO_RECUERDOS = null;
+function recuerdos() {
+  let st;
+  try {
+    st = fs.statSync(MEMORIA());
+  } catch (e) {
+    return new Map();
+  }
+  if (MEMO_RECUERDOS && MEMO_RECUERDOS.bytes === st.size && MEMO_RECUERDOS.mtime === st.mtimeMs) return MEMO_RECUERDOS.items;
+  const items = new Map();
+  for (const e of leerJsonl(MEMORIA())) {
+    if (e.id && e.texto) items.set(e.id, { ...e, refuerzos: Number(e.refuerzos) || 0, ultimo: e.ultimo || e.ts, k: tokens(`${e.texto} ${(e.etiquetas || []).join(' ')}`) });
+    else if (e.refuerza && items.has(e.refuerza)) {
+      const m = items.get(e.refuerza);
+      m.refuerzos++;
+      m.ultimo = e.ts;
+    } else if (e.olvida) items.delete(e.olvida);
+  }
+  MEMO_RECUERDOS = { bytes: st.size, mtime: st.mtimeMs, items };
+  return items;
+}
+// Las claves viven en el Llavero de Obsidian, nunca en notas: la memoria es texto plano dentro del vault
+const SECRETO = /\b(sk-[A-Za-z0-9_-]{16,}|sk-ant-[A-Za-z0-9_-]{16,}|gh[pous]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abpr]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,})|(contraseña|password|passwd|api[_ -]?key|token)\s*[:=]\s*\S{6,}/i;
+function guardarMemoria({ texto, tipo, agente, etiquetas, ejecucion, proyecto }) {
+  const t = sinAcentos(tipo || 'hecho');
+  if (!TIPOS_MEMORIA.includes(t)) return `Tipo de recuerdo: ${TIPOS_MEMORIA.join(', ')}.`;
+  const txt = corto(texto, 500);
+  if (txt.length < 8) return 'El recuerdo está vacío o es muy corto: escribe una o dos frases que sirvan la próxima vez.';
+  if (SECRETO.test(txt)) return 'No guardo eso: parece una clave, un token o una contraseña. Las claves van en el Llavero, no en el vault.';
+  const p = proyecto ? buscarProyecto(cargarIndice(), proyecto) : null;
+  if (proyecto && !p) return `No existe el proyecto "${proyecto}". ${listaProyectos()}`;
+  const pr = p ? path.basename(p.rel, '.md') : undefined;
+  const k = new Set(tokens(txt));
+  for (const m of recuerdos().values()) {
+    if (m.tipo !== t || m.proyecto !== pr) continue;
+    let comunes = 0;
+    for (const x of new Set(m.k)) if (k.has(x)) comunes++;
+    if (comunes / (k.size + new Set(m.k).size - comunes || 1) >= 0.8) {
+      anexar(MEMORIA(), { ts: new Date().toISOString(), refuerza: m.id, agente: corto(agente, 40) || undefined });
+      return `Ya lo sabía (${m.id}): lo reforcé, así pesa más la próxima vez.`;
+    }
+  }
+  const id = `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+  anexar(MEMORIA(), { id, ts: new Date().toISOString(), tipo: t, agente: corto(agente, 40) || undefined, proyecto: pr, texto: txt, etiquetas: listaDe(etiquetas).slice(0, 8), ejecucion: ejecucion ? corto(ejecucion, 70) : undefined });
+  return `Guardado ${id}${pr ? ` en ${pr}` : ''}.`;
+}
+function olvidarMemoria({ id, motivo }) {
+  const m = recuerdos().get(String(id || '').trim());
+  if (!m) return `No tengo el recuerdo "${id}".`;
+  anexar(MEMORIA(), { ts: new Date().toISOString(), olvida: m.id, motivo: corto(motivo, 200) });
+  return `Olvidado ${m.id}: ya no aparece en el contexto.`;
+}
+/** Reescribe la memoria aplicando refuerzos y olvidos. Mecánico y sin IA; antes guarda un respaldo. */
+function compactarMemoria() {
+  const abs = MEMORIA();
+  for (let intento = 0; intento < 3; intento++) {
+    let st;
+    try {
+      st = fs.statSync(abs);
+    } catch (e) {
+      return 'No hay memoria todavía.';
+    }
+    const antes = leerJsonl(abs).length;
+    const items = [...recuerdos().values()].map(({ k, ...m }) => m);
+    respaldar(abs, 'memoria.jsonl');
+    const tmp = `${abs}.boveda-tmp`;
+    fs.writeFileSync(tmp, items.map((m) => JSON.stringify(m)).join('\n') + (items.length ? '\n' : ''));
+    if (fs.statSync(abs).size !== st.size) {
+      fs.unlinkSync(tmp); // alguien anotó mientras tanto: se vuelve a intentar con lo nuevo
+      continue;
+    }
+    fs.renameSync(tmp, abs);
+    MEMO_RECUERDOS = null;
+    return `Memoria compactada: ${antes} líneas → ${items.length} recuerdos.`;
+  }
+  return 'La memoria se está usando mucho ahora mismo; intenta compactar más tarde.';
+}
+/** load_context: lo que ya se sabe sobre una tarea (estado del proyecto, recuerdos y ejecuciones anteriores), dentro de un presupuesto fijo. */
+async function contexto({ consulta, agente, alcance, proyecto, presupuesto_tokens } = {}) {
+  const tope = Math.min(3000, Math.max(100, Number(presupuesto_tokens) || 600)) * 4; // caracteres
+  const al = sinAcentos(alcance || 'todo');
+  const q = tokens(consulta || '');
+  const L = [];
+  let usado = 0;
+  let considerados = 0;
+  let fuentes = 0;
+  const poner = (l) => (usado + l.length + 1 > tope ? false : (L.push(l), (usado += l.length + 1), true));
+  // Un apartado entra con su título solo si cabe al menos una línea, y nunca pasa de su cupo
+  const apartado = (titulo, items, cupo) => {
+    const hasta = Math.min(tope, usado + cupo);
+    let puestas = 0;
+    for (const l of items) {
+      if (usado + l.length + 1 + (puestas ? 0 : titulo.length + 1) > hasta) break;
+      if (!puestas) poner(titulo);
+      poner(l);
+      puestas++;
+    }
+    fuentes += puestas;
+  };
+  // Con un proyecto, primero su estado (hasta 40 % del presupuesto)
+  let pr = null;
+  if (proyecto) {
+    const p = buscarProyecto(cargarIndice(), proyecto);
+    if (!p) return `No existe el proyecto "${proyecto}". ${listaProyectos()}`;
+    pr = path.basename(p.rel, '.md');
+    considerados += p.bytes;
+    fuentes++;
+    for (const l of bloqueProyecto(p, Math.round(tope * 0.4)).split('\n')) poner(l);
+  }
+  // BM25 simple: la consulta contra cada documento ya tokenizado
+  const puntuar = (docs) => {
+    const N = docs.length || 1;
+    const df = new Map();
+    let largo = 0;
+    for (const d of docs) {
+      largo += d.k.length;
+      for (const t of new Set(d.k)) df.set(t, (df.get(t) || 0) + 1);
+    }
+    const prom = largo / N || 1;
+    return (d) => {
+      let s = 0;
+      for (const t of q) {
+        const f = d.k.filter((x) => x === t).length;
+        if (!f) continue;
+        const idf = Math.log(1 + (N - (df.get(t) || 0) + 0.5) / ((df.get(t) || 0) + 0.5));
+        s += (idf * f * 2.2) / (f + 1.2 * (0.25 + 0.75 * (d.k.length / prom)));
+      }
+      return s;
+    };
+  };
+  // Lo que apenas roza la consulta (una palabra suelta en común) no entra: se corta bajo un cuarto del mejor puntaje
+  const relevantes = (orden) => (q.length && orden.length ? orden.filter((x) => x.s >= orden[0].s * 0.25) : orden);
+  let lineasMem = [];
+  if (al === 'todo' || al === 'memoria') {
+    const items = [...recuerdos().values()];
+    considerados += items.reduce((a, m) => a + m.texto.length, 0);
+    const bm = puntuar(items);
+    const ahora = Date.now();
+    const orden = items
+      .map((m) => {
+        const dias = (ahora - Date.parse(m.ultimo || m.ts)) / 86400000;
+        const vigencia = ['preferencia', 'procedimiento'].includes(m.tipo) ? 1 : Math.pow(0.5, dias / 120); // lo estable no envejece
+        const base = q.length ? bm(m) : !pr ? 1 : m.proyecto === pr ? 1 : m.proyecto ? 0 : 0.5; // sin consulta: lo del proyecto y lo general
+        const delProyecto = !pr ? 1 : m.proyecto === pr ? 2 : m.proyecto ? 0.3 : 1; // lo de otro proyecto casi nunca sirve
+        return { m, s: base * delProyecto * (1 + 0.3 * Math.log2(1 + m.refuerzos)) * vigencia * (agente && m.agente === agente ? 1.2 : 1) };
+      })
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s);
+    lineasMem = relevantes(orden).map(({ m }) => {
+      const datos = [m.tipo, m.proyecto && m.proyecto !== pr ? m.proyecto : '', m.agente || '', String(m.ultimo || m.ts).slice(0, 10), m.refuerzos ? `×${m.refuerzos + 1}` : ''].filter(Boolean);
+      return `- [${datos.join(' · ')}] ${m.texto} (${m.id})`;
+    });
+  }
+  let lineasRun = [];
+  if (al === 'todo' || al === 'ejecuciones') {
+    const idx = cargarIndice();
+    const runs = idx.notas
+      .filter((n) => n.fm.tipo === 'ejecucion' && n.fm.estado && n.fm.estado !== 'en curso')
+      .map((n) => ({ n, k: n.secciones.flatMap((s) => s.k.split(' ')).concat(tokens(n.fm.meta || '')) }));
+    considerados += runs.reduce((a, x) => a + x.n.bytes, 0);
+    const bm = puntuar(runs);
+    const delProyecto = (x) => (!pr ? 1 : sinAcentos(String(x.n.fm.proyecto || '').replace(/^\[\[|\]\]$/g, '')) === sinAcentos(pr) ? 2 : 0.3);
+    const orden = runs.map((x) => ({ x, s: (q.length ? bm(x) : 1) * delProyecto(x) })).filter((y) => y.s > 0).sort((a, b) => b.s - a.s);
+    lineasRun = relevantes(orden)
+      .slice(0, 5)
+      .map(({ x }) => {
+        const f = x.n.fm;
+        return `- ${String(f.inicio || '').slice(0, 10)} · "${corto(f.meta, 90)}" → ${f.estado} · ${usd(f.gasto_usd)}${f.resumen ? ` · ${corto(f.resumen, 160)}` : ''} (${path.basename(x.n.rel, '.md')})`;
+      });
+  }
+  // Los recuerdos no se comen todo: si hay ejecuciones parecidas, se quedan con un 60 % de lo que resta
+  const resto = tope - usado;
+  apartado('Memoria (lo que ya se sabe):', lineasMem, lineasRun.length ? Math.round(resto * 0.6) : resto);
+  apartado('Ejecuciones parecidas:', lineasRun, tope - usado);
+  if (!L.length) return q.length ? 'Sin memoria previa sobre esto: es la primera vez que se trabaja en algo así.' : 'La memoria está vacía.';
+  medir('contexto', corto(consulta, 80), usado, considerados, fuentes);
+  return `${L.join('\n')}\n(~${tok(usado)} tokens; presupuesto ${tope / 4})`;
+}
+// Proyectos: una nota por proyecto, que escriben tú y tus agentes (por secciones). La memoria se agrupa por proyecto.
+function buscarProyecto(idx, ref) {
+  const r = sinAcentos(String(ref || '').replace(/^\[\[|\]\]$/g, '').replace(/\.md$/i, '').split('/').pop().trim());
+  if (!r) return null;
+  const ps = idx.notas.filter((n) => n.fm.tipo === 'proyecto' && n.rel.startsWith(PROYECTOS + '/') && !n.privada);
+  const exacto = ps.find((n) => sinAcentos(path.basename(n.rel, '.md')) === r);
+  if (exacto) return exacto;
+  const parecidos = ps.filter((n) => sinAcentos(path.basename(n.rel, '.md')).includes(r));
+  return parecidos.length === 1 ? parecidos[0] : null; // solo si no hay dudas: la memoria de un proyecto no debe caer en otro
+}
+function listaProyectos() {
+  const ps = cargarIndice().notas.filter((n) => n.fm.tipo === 'proyecto' && n.rel.startsWith(PROYECTOS + '/') && !n.privada);
+  if (!ps.length) return 'Todavía no hay proyectos (créalos con proyecto crear).';
+  return `Proyectos (${ps.length}):\n${ps.slice(0, 40).map((n) => `- ${path.basename(n.rel, '.md')} · ${n.fm.estado || 'sin estado'}${n.fm.resumen ? ` — ${corto(n.fm.resumen, 100)}` : ''}`).join('\n')}`;
+}
+/** Lo justo para retomar un proyecto: estado actual, pendientes y las últimas decisiones. */
+function bloqueProyecto(n, max = 2400) {
+  const f = n.fm;
+  const sec = (t) => n.secciones.find((s) => sinAcentos(s.titulo.split('>').pop().trim()) === sinAcentos(t)); // los títulos llegan con su ruta: "Proyecto > Estado actual"
+  const L = [`Proyecto ${path.basename(n.rel, '.md')} (${f.estado || 'sin estado'})${f.repo ? ` · repo: ${f.repo}` : ''}${f.stack ? ` · ${f.stack}` : ''}`];
+  if (f.resumen) L.push(corto(f.resumen, 300));
+  for (const [t, parte] of [['Estado actual', 0.4], ['Pendientes', 0.3], ['Decisiones', 0.3]]) {
+    const s = sec(t);
+    if (!s || !s.texto.trim()) continue;
+    const lineas = s.texto.split('\n').filter((l) => l.trim());
+    const txt = (t === 'Decisiones' ? lineas.slice(-6) : lineas).join('\n'); // de las decisiones, las más recientes
+    L.push(`${t}:`, txt.length > max * parte ? `${txt.slice(0, Math.round(max * parte))}…` : txt);
+  }
+  medir('proyecto', n.rel, Math.min(max, L.join('\n').length), n.bytes, 1);
+  return recortar(L.join('\n'), max);
+}
+function plantillaProyecto({ nombre, resumen, repo, stack, estado }) {
+  const est = ['idea', 'activo', 'pausado', 'terminado'].includes(sinAcentos(estado)) ? sinAcentos(estado) : 'activo';
+  return [
+    '---',
+    'tipo: proyecto',
+    `estado: ${est}`,
+    `resumen: ${JSON.stringify(corto(resumen, 200))}`,
+    `repo: ${JSON.stringify(corto(repo, 300))}`,
+    'stack:',
+    ...listaDe(stack).map((s) => `  - ${JSON.stringify(s)}`),
+    `inicio: ${hoy()}`,
+    `actualizado: ${hoy()}`,
+    'tags:',
+    '  - proyecto',
+    '---',
+    `# ${nombre}`,
+    '```raiz-botones',
+    '🤖 Instrucciones para tu agente | comando: raiz:project-agent-snippet | estilo: secundario',
+    '```',
+    '',
+    '## Contexto',
+    corto(resumen, 500) || '%% Qué es, para quién y por qué existe. %%',
+    '',
+    '## Estado actual',
+    '%% Qué funciona, qué falta y en qué se quedó la última sesión. Se reemplaza entero al terminar cada sesión. %%',
+    '',
+    '## Pendientes',
+    '',
+    '## Decisiones',
+    '%% Una viñeta por decisión: fecha, qué se decidió y por qué. Solo se agrega. %%',
+    '',
+    '## Aprendizajes',
+    '%% Lo que conviene recordar la próxima vez: errores, trucos, comandos. %%',
+    '',
+  ].join('\n');
+}
+function crearProyecto({ nombre, proyecto, resumen, repo, stack, estado }) {
+  const n = String(nombre || proyecto || '').replace(/[\\/:*?"<>|#^[\]]/g, '').replace(/\s+/g, ' ').trim().replace(/^\.+\s*/, '').slice(0, 80); // sin puntos al inicio: nada de archivos ocultos
+  if (!n) return 'Falta el nombre del proyecto.';
+  const rel = `${PROYECTOS}/${n}.md`;
+  const abs = path.join(RAIZ, rel);
+  if (fs.existsSync(abs) || buscarProyecto(cargarIndice(), n)?.rel === rel) return `Ya existe ${rel}: usa proyecto ver.`;
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  guardar(abs, plantillaProyecto({ nombre: n, resumen, repo, stack, estado }));
+  return `Creado ${rel}. Escribe en sus secciones con agregar_a_seccion (Decisiones, Pendientes, Aprendizajes) y reemplazar_seccion (Estado actual).`;
+}
+async function proyecto(a = {}) {
+  const acc = sinAcentos(a.accion || 'lista');
+  if (acc === 'lista') return listaProyectos();
+  if (acc === 'ver') {
+    const p = buscarProyecto(cargarIndice(), a.proyecto || a.nombre);
+    return p ? bloqueProyecto(p, 4000) : `No existe el proyecto "${a.proyecto || a.nombre || ''}". ${listaProyectos()}`;
+  }
+  if (acc === 'crear') return crearProyecto(a);
+  return 'accion: lista, ver o crear.';
+}
+async function memoria(a = {}) {
+  const acc = sinAcentos(a.accion || 'contexto');
+  if (acc === 'contexto') return contexto(a);
+  if (acc === 'guardar') return guardarMemoria(a);
+  if (acc === 'olvidar') return olvidarMemoria(a);
+  if (acc === 'compactar') return compactarMemoria();
+  return 'accion: contexto, guardar u olvidar.';
+}
+async function ejecucion(a = {}) {
+  const acc = sinAcentos(a.accion || '');
+  if (acc === 'iniciar') return iniciarEjecucion(a);
+  if (acc === 'evento') return eventoEjecucion(a);
+  if (acc === 'estado') return verEjecucion(a);
+  if (acc === 'cerrar') return cerrarEjecucion(a);
+  if (acc === 'lista') return listaEjecuciones(a);
+  return 'accion: iniciar, evento, estado, cerrar o lista.';
+}
+
 // ───────────── Servidor MCP (stdio, JSON-RPC 2.0) ─────────────
 const texto = (d) => ({ type: 'string', description: d });
 const LECTURA = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
@@ -919,13 +1448,33 @@ const HERRAMIENTAS = [
   { name: 'reemplazar_seccion', ann: ESCRITURA, description: 'Reemplaza el contenido de UNA sección de una página de la wiki, sin tocar el resto. No funciona en páginas revisadas por la persona (revisado: true).', inputSchema: { type: 'object', properties: { nota: texto('Página de 13 Wiki'), titulo: texto('Sección a reemplazar'), texto: texto('Nuevo contenido de la sección') }, required: ['nota', 'titulo', 'texto'] }, run: (a) => reemplazarSeccion(a.nota, a.titulo, a.texto) },
   { name: 'registrar', ann: ESCRITURA, description: 'Agrega una entrada al Registro de la wiki (solo se agrega al final).', inputSchema: { type: 'object', properties: { tipo: texto('ingesta | consulta | revisión | edición'), titulo: texto('Qué se hizo'), paginas: { type: 'array', items: { type: 'string' } } }, required: ['tipo', 'titulo'] }, run: (a) => registrar(a) },
   { name: 'marcar_resultado', ann: ESCRITURA, description: 'Marca cómo resultó una respuesta guardada (util, sin_salida o corregida, con la corrección). Alimenta las lecciones.', inputSchema: { type: 'object', properties: { nota: texto('Página de 13 Wiki/Respuestas'), resultado: texto('util | sin_salida | corregida'), correccion: texto('Si fue corregida: la respuesta correcta') }, required: ['nota', 'resultado'] }, run: (a) => marcarResultado(a) },
+  { name: 'memoria', ann: ESCRITURA, description: 'Memoria persistente entre sesiones y agentes. contexto: lo que ya se sabe para una tarea, con tope de tokens (úsala al empezar). guardar: un recuerdo breve y reutilizable, no un log. olvidar: descarta uno por su id.', inputSchema: { type: 'object', properties: { accion: { type: 'string', enum: ['contexto', 'guardar', 'olvidar'] }, consulta: { type: 'string' }, proyecto: { type: 'string' }, alcance: { type: 'string', enum: ['todo', 'memoria', 'ejecuciones'] }, presupuesto_tokens: { type: 'number' }, texto: { type: 'string' }, tipo: { type: 'string', enum: TIPOS_MEMORIA }, agente: { type: 'string' }, etiquetas: { type: 'array', items: { type: 'string' } }, ejecucion: { type: 'string' }, id: { type: 'string' }, motivo: { type: 'string' } }, required: ['accion'] }, run: (a) => memoria(a) },
+  { name: 'proyecto', ann: ESCRITURA, description: 'Proyectos de 14 Proyectos. lista; ver: estado actual, pendientes y últimas decisiones; crear. Para escribir en uno usa agregar_a_seccion o reemplazar_seccion.', inputSchema: { type: 'object', properties: { accion: { type: 'string', enum: ['lista', 'ver', 'crear'] }, proyecto: { type: 'string' }, nombre: { type: 'string' }, resumen: { type: 'string' }, repo: { type: 'string' }, stack: { type: 'array', items: { type: 'string' } }, estado: { type: 'string', enum: ['idea', 'activo', 'pausado', 'terminado'] } }, required: ['accion'] }, run: (a) => proyecto(a) },
+  { name: 'ejecucion', ann: ESCRITURA, description: 'Registro de una ejecución de varios agentes. iniciar (meta, tope_usd, plazo HH:MM, proyecto): da el id y el contexto previo. evento: anota un paso en una línea; responde DETENER si se pasó el tope o el plazo. estado, cerrar (estado, resumen), lista.', inputSchema: { type: 'object', properties: { accion: { type: 'string', enum: ['iniciar', 'evento', 'estado', 'cerrar', 'lista'] }, ejecucion: { type: 'string' }, meta: { type: 'string' }, tope_usd: { type: 'number' }, plazo: { type: 'string' }, proyecto: { type: 'string' }, agentes: { type: 'array', items: { type: 'string' } }, agente: { type: 'string' }, tipo: { type: 'string', enum: TIPOS_EVENTO }, texto: { type: 'string' }, costo_usd: { type: 'number' }, tokens_entrada: { type: 'number' }, tokens_salida: { type: 'number' }, ms: { type: 'number' }, estado: { type: 'string', description: 'cerrar: hecha | fallida | cancelada | detenida · evento agente: running | idle | done' }, resumen: { type: 'string' }, resultado: { type: 'string' } }, required: ['accion'] }, run: (a) => ejecucion(a) },
   { name: 'medicion', ann: LECTURA, description: 'Cuántos tokens ha ahorrado la herramienta, al leer y al escribir, medido llamada a llamada.', inputSchema: { type: 'object', properties: {} }, run: () => medicion() },
 ];
+// Cada definición viaja en cada vuelta del agente: el perfil de siempre (vault) no cambia y no cuesta más por tener lo nuevo
+const PERFILES = {
+  vault: ['lecciones', 'buscar', 'seccion', 'esqueleto', 'vecinos', 'explorar', 'camino', 'datos', 'crear_pagina', 'agregar_a_seccion', 'reemplazar_seccion', 'registrar', 'marcar_resultado', 'medicion'],
+  proyectos: ['lecciones', 'buscar', 'seccion', 'esqueleto', 'vecinos', 'explorar', 'camino', 'datos', 'agregar_a_seccion', 'reemplazar_seccion', 'memoria', 'proyecto'],
+  agente: ['buscar', 'seccion', 'esqueleto', 'memoria', 'ejecucion'],
+  orquestador: ['lecciones', 'buscar', 'esqueleto', 'datos', 'memoria', 'proyecto', 'ejecucion'],
+  todo: null,
+};
+function herramientasDelPerfil() {
+  const lista = opcion('herramientas');
+  const perfil = opcion('perfil') || 'vault';
+  const nombres = lista ? lista.split(',').map((x) => x.trim()) : perfil in PERFILES ? PERFILES[perfil] : PERFILES.vault;
+  return nombres ? HERRAMIENTAS.filter((h) => nombres.includes(h.name)) : HERRAMIENTAS;
+}
 const INSTRUCCIONES =
   'Bóveda de Obsidian de una persona (vida personal, estudio y entrenamiento), en español. Para ahorrar tokens: ' +
   '1) al empezar, `lecciones`; 2) `buscar` antes de abrir cualquier nota; 3) lee solo la `seccion` que necesitas; 4) recorre el grafo con `vecinos`, `explorar` o `camino` (las páginas de estudio cuelgan unas de otras: `esqueleto` muestra las que están dentro); ' +
   '5) para datos personales, `datos`; 6) para escribir en la wiki usa `crear_pagina`, `agregar_a_seccion` y `reemplazar_seccion`, nunca reescribas una página entera. Reglas completas en AGENTS.md.';
+const INSTRUCCIONES_MEMORIA =
+  ' Memoria: al empezar una tarea, `memoria` accion=contexto (con el proyecto, si es de uno); al terminar, guarda solo lo que sirva la próxima vez y actualiza la sección "Estado actual" del proyecto.';
 function servidorMcp() {
+  const expuestas = herramientasDelPerfil();
   const enviar = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
   let buffer = '';
   process.stdin.setEncoding('utf8');
@@ -946,11 +1495,11 @@ function servidorMcp() {
       const ok = (result) => m.id !== undefined && enviar({ jsonrpc: '2.0', id: m.id, result });
       const err = (code, message) => m.id !== undefined && enviar({ jsonrpc: '2.0', id: m.id, error: { code, message } });
       try {
-        if (m.method === 'initialize') ok({ protocolVersion: m.params?.protocolVersion || '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'raiz-boveda', version: VERSION }, instructions: INSTRUCCIONES });
+        if (m.method === 'initialize') ok({ protocolVersion: m.params?.protocolVersion || '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'raiz-boveda', version: VERSION }, instructions: INSTRUCCIONES + (expuestas.some((h) => h.name === 'memoria') ? INSTRUCCIONES_MEMORIA : '') });
         else if (m.method === 'ping') ok({});
-        else if (m.method === 'tools/list') ok({ tools: HERRAMIENTAS.map(({ name, description, inputSchema, ann }) => ({ name, description, inputSchema, annotations: ann })) });
+        else if (m.method === 'tools/list') ok({ tools: expuestas.map(({ name, description, inputSchema, ann }) => ({ name, description, inputSchema, annotations: ann })) });
         else if (m.method === 'tools/call') {
-          const h = HERRAMIENTAS.find((x) => x.name === m.params?.name);
+          const h = expuestas.find((x) => x.name === m.params?.name);
           if (!h) err(-32602, `Herramienta desconocida: ${m.params?.name}`);
           else
             Promise.resolve()
@@ -1005,6 +1554,28 @@ async function principal() {
         return out(registrar({ tipo: resto[0], titulo: resto.slice(1).join(' '), paginas: opcion('paginas') }));
       case 'marcar':
         return out(marcarResultado({ nota: resto[0], resultado: resto[1], correccion: opcion('correccion') }));
+      case 'memoria': {
+        const sub = sinAcentos(resto[0] || 'contexto');
+        if (sub === 'contexto') return out(await contexto({ consulta: resto.slice(1).join(' '), proyecto: opcion('proyecto'), agente: opcion('agente'), alcance: opcion('alcance'), presupuesto_tokens: opcion('presupuesto') }));
+        if (sub === 'guardar') return out(guardarMemoria({ tipo: resto[1], texto: resto.slice(2).join(' '), proyecto: opcion('proyecto'), agente: opcion('agente'), etiquetas: opcion('etiquetas'), ejecucion: opcion('ejecucion') }));
+        if (sub === 'olvidar') return out(olvidarMemoria({ id: resto[1], motivo: resto.slice(2).join(' ') }));
+        if (sub === 'compactar') return out(compactarMemoria());
+        return out('memoria contexto <consulta> · guardar <tipo> <texto> · olvidar <id> <motivo> · compactar');
+      }
+      case 'proyecto': {
+        const sub = sinAcentos(resto[0] || 'lista');
+        if (sub === 'crear') return out(crearProyecto({ nombre: resto.slice(1).join(' '), resumen: opcion('resumen'), repo: opcion('repo'), stack: opcion('stack'), estado: opcion('estado') }));
+        return out(await proyecto({ accion: sub, proyecto: resto.slice(1).join(' ') }));
+      }
+      case 'ejecucion': {
+        const sub = sinAcentos(resto[0] || 'lista');
+        if (sub === 'iniciar') return out(await iniciarEjecucion({ meta: resto.slice(1).join(' '), tope_usd: opcion('tope'), plazo: opcion('plazo'), agentes: opcion('agentes'), proyecto: opcion('proyecto'), presupuesto_tokens: opcion('presupuesto') }));
+        if (sub === 'evento') return out(eventoEjecucion({ ejecucion: resto[1], agente: resto[2], tipo: resto[3], texto: resto.slice(4).join(' '), costo_usd: opcion('costo'), tokens_entrada: opcion('entrada'), tokens_salida: opcion('salida'), ms: opcion('ms'), estado: opcion('estado') }));
+        if (sub === 'estado') return out(verEjecucion({ ejecucion: resto[1] }));
+        if (sub === 'cerrar') return out(cerrarEjecucion({ ejecucion: resto[1], estado: resto[2], resumen: resto.slice(3).join(' '), resultado: opcion('resultado') }));
+        if (sub === 'lista') return out(listaEjecuciones({ limite: opcion('limite') }));
+        return out('ejecucion iniciar <meta> · evento <id> <agente> <tipo> <texto> · estado <id> · cerrar <id> <estado> <resumen> · lista');
+      }
       case 'medicion':
         return out(medicion());
       case 'estado':
@@ -1015,8 +1586,10 @@ async function principal() {
         out(
           `boveda ${VERSION} — consulta y edita el vault gastando pocos tokens.\n` +
             'Leer: lecciones · buscar <consulta> · seccion <nota> <título> · esqueleto <nota> · vecinos <nota> · explorar <nota> [--profundidad 2] · camino <nota> <nota> · datos [--desde --hasta --columnas]\n' +
-            'Escribir (solo 13 Wiki): crear <clase> <título> --resumen "…" [--fuentes a,b --cuerpo "…"] · agregar <nota> <sección> <texto> · reemplazar <nota> <sección> <texto> · registrar <tipo> <título> [--paginas a,b] · marcar <nota> <util|sin_salida|corregida>\n' +
-            'Otros: medicion · estado · mcp'
+            'Escribir: crear <clase> <título> --resumen "…" [--fuentes a,b --cuerpo "…"] (wiki) · agregar <nota> <sección> <texto> · reemplazar <nota> <sección> <texto> · registrar <tipo> <título> [--paginas a,b] · marcar <nota> <util|sin_salida|corregida> (agregar y reemplazar sirven en 13 Wiki y 14 Proyectos)\n' +
+            'Proyectos y agentes: proyecto lista|ver <nombre>|crear <nombre> [--resumen --repo --stack a,b] · memoria contexto <consulta> [--proyecto --presupuesto 600] · memoria guardar <tipo> <texto> [--proyecto --agente] · memoria olvidar <id> · memoria compactar\n' +
+            'Ejecuciones: ejecucion iniciar <meta> [--tope 10 --plazo 07:40 --proyecto] · evento <id> <agente> <tipo> <texto> [--costo --entrada --salida --ms] · estado <id> · cerrar <id> <hecha|fallida|cancelada|detenida> <resumen> · lista\n' +
+            'Otros: medicion · estado · mcp [--perfil vault|proyectos|agente|orquestador|todo] [--herramientas a,b]'
         );
     }
   } catch (e) {
@@ -1025,4 +1598,4 @@ async function principal() {
   }
 }
 if (require.main === module) principal();
-module.exports = { buscar, seccion, esqueleto, vecinos, explorar, camino, datos, lecciones, crearPagina, agregarASeccion, reemplazarSeccion, registrar, marcarResultado, medicion, estado, cargarIndice, tokens };
+module.exports = { buscar, seccion, esqueleto, vecinos, explorar, camino, datos, lecciones, crearPagina, agregarASeccion, reemplazarSeccion, registrar, marcarResultado, medicion, estado, cargarIndice, tokens, contexto, guardarMemoria, olvidarMemoria, compactarMemoria, iniciarEjecucion, eventoEjecucion, verEjecucion, cerrarEjecucion, listaEjecuciones, crearProyecto, listaProyectos, proyecto, memoria, ejecucion };

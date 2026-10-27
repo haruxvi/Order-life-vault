@@ -21,6 +21,7 @@ Un vault de Obsidian para ordenar la vida personal, académica y de entrenamient
 | **Conocimiento** | Mapas de contenido, menciones sin enlazar, notas relacionadas con IA, preguntas a todo el vault y repaso espaciado. |
 | **Wiki para IA y agentes** | Una base de conocimiento que mantiene la IA (patrón *LLM Wiki*): resúmenes, entidades, conceptos y temas enlazados. Trae reglas listas para agentes en `AGENTS.md`, y Raíz mantiene solo el índice, el registro y los datos. |
 | **Ahorro de tokens que escala** | `boveda`, una herramienta para agentes (CLI y servidor MCP). Busca por palabras y por significado, lee y escribe por secciones, recorre el grafo y recuerda lecciones entre sesiones: ~630 tokens por búsqueda con 100 notas y con 20.000. Mide su ahorro y nunca deja salir las notas privadas. |
+| **Proyectos y memoria para agentes** | Una nota por proyecto de desarrollo (contexto, estado actual, pendientes y decisiones) y una memoria que comparten tus agentes entre sesiones. Un agente retoma un proyecto con una sola llamada de ~600 tokens, y los sistemas de varios agentes anotan cada paso con un tope de gasto y de plazo. |
 | **Bandeja, agenda y etiquetas** | Captura rápida, eventos y reuniones, tareas con fecha y etiquetas organizadas. |
 | **Personalización** | Imagen de fondo por nota o por apartado (también desde tu PC), tipografía para el texto, los títulos y la interfaz, y el tema "bosque nocturno". |
 
@@ -87,9 +88,11 @@ En el iPhone o Android todo funciona menos la IA local: usa un proveedor con API
 | `11 Biblioteca` | Juegos, libros, anime, manga, películas, series, videos y cursos |
 | `12 Conocimiento` | Notas, mapas de contenido, etiquetas y repaso (las escribes tú) |
 | `13 Wiki` | Wiki mantenida por la IA: índice, registro, fuentes, resúmenes, entidades, conceptos, temas y respuestas |
+| `14 Proyectos` | Tus proyectos de desarrollo, que escriben tú y tus agentes |
+| `15 Agentes` | Ejecuciones, registros y memoria de tus agentes |
 
 ### Qué no se sube a este repositorio
-Tus API keys, las fuentes de `13 Wiki/Fuentes` y los datos de `13 Wiki/Datos`, tus imágenes de `06 Plantillas/Portadas`, las portadas descargadas de la biblioteca, tus fuentes propias, el índice de la IA (`vectores.json`), la caché y la medición de `boveda`, tu registro de consumo y el estado de tu espacio de trabajo.
+Tus API keys, las fuentes de `13 Wiki/Fuentes` y los datos de `13 Wiki/Datos`, tus imágenes de `06 Plantillas/Portadas`, las portadas descargadas de la biblioteca, tus fuentes propias, el índice de la IA (`vectores.json`), la caché y la medición de `boveda`, tus proyectos y la memoria y los registros de tus agentes (solo se suben sus paneles), tu registro de consumo y el estado de tu espacio de trabajo.
 
 ### Aviso sobre software de terceros
 Los plugins de la comunidad que vienen en `.obsidian/plugins` **no son de mi autoría**. Pertenecen a sus autores y se incluyen sin modificaciones, cada uno con su licencia original. Los servicios y programas de IA externos se rigen por sus propios términos. El detalle está en **[TERCEROS.md](TERCEROS.md)**.
@@ -113,6 +116,7 @@ An Obsidian vault for organizing personal, academic and training life, with the 
 | **Knowledge** | Maps of content, unlinked mentions, AI-related notes, questions over the whole vault and spaced repetition. |
 | **Wiki for AI and agents** | A knowledge base maintained by the AI (the *LLM Wiki* pattern): linked summaries, entities, concepts and topics. It comes with ready-made rules for agents in `AGENTS.md`, and Raíz keeps the index, log and data up to date by itself. |
 | **Token savings that scale** | `boveda`, a tool for agents (CLI and MCP server). It searches by keyword and by meaning, reads and writes by section, walks the graph and remembers lessons across sessions: ~630 tokens per search with 100 notes and with 20,000. It measures its own savings and never lets private notes out. |
+| **Projects and memory for agents** | One note per development project (context, current status, to-dos and decisions) and a memory your agents share across sessions. An agent picks up a project with a single ~600-token call, and multi-agent systems log every step under a spending cap and a deadline. |
 | **Inbox, agenda and tags** | Quick capture, events and meetings, dated tasks and organized tags. |
 | **Customization** | A background image per note or per section (including images from your PC), typography for body text, headings and the interface, and the "night forest" theme. |
 
@@ -179,9 +183,11 @@ On iPhone or Android everything works except local AI: use an API provider, or y
 | `11 Biblioteca` | Games, books, anime, manga, movies, series, videos and courses |
 | `12 Conocimiento` | Notes, maps of content, tags and review (written by you) |
 | `13 Wiki` | AI-maintained wiki: index, log, sources, summaries, entities, concepts, topics and answers |
+| `14 Proyectos` | Your development projects, written by you and your agents |
+| `15 Agentes` | Your agents' runs, logs and memory |
 
 ### What is not in this repository
-Your API keys, the sources in `13 Wiki/Fuentes` and the data in `13 Wiki/Datos`, your images in `06 Plantillas/Portadas`, library covers downloaded from external services, your own font files, the AI index (`vectores.json`), the cache and measurements of `boveda`, your usage log and your workspace state.
+Your API keys, the sources in `13 Wiki/Fuentes` and the data in `13 Wiki/Datos`, your images in `06 Plantillas/Portadas`, library covers downloaded from external services, your own font files, the AI index (`vectores.json`), the cache and measurements of `boveda`, your projects and your agents' memory and logs (only their panels are included), your usage log and your workspace state.
 
 ### Third-party software notice
 The community plugins bundled in `.obsidian/plugins` were **not written by me**. They belong to their respective authors and are included unmodified, each under its original license. External AI services and programs are governed by their own terms. Details are in **[THIRD_PARTY.md](THIRD_PARTY.md)**.

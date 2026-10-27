@@ -503,3 +503,11 @@
 /* ── Botones propios (raiz-botones) ── */
 .raiz-botones { display: flex; flex-wrap: wrap; gap: 0.45em; margin: 0.2em 0 0.5em; }
 .raiz-botones .raiz-btn { display: inline-flex; align-items: center; cursor: pointer; }
+
+/* Panel de agentes (15 Agentes) */
+.raiz-agentes .raiz-ag-barra { height: 6px; border-radius: 999px; background: var(--background-modifier-border); overflow: hidden; margin: 0.2em 0 0.4em; }
+.raiz-agentes .raiz-ag-barra-in { height: 100%; background: var(--interactive-accent); transition: width 0.4s ease; }
+.raiz-agentes .raiz-ag-barra-in.is-alto { background: #f59e0b; }
+.raiz-agentes .raiz-ag-barra-in.is-tope { background: #ef4444; }
+.raiz-agentes .raiz-ag-log { font-family: var(--font-monospace); font-size: 0.8em; background: var(--background-secondary); border-radius: 8px; padding: 0.5em 0.7em; margin: 0.4em 0 1em; max-height: 14em; overflow: auto; }
+.raiz-agentes .raiz-ag-log > div { white-space: pre-wrap; word-break: break-word; padding: 0.1em 0; }

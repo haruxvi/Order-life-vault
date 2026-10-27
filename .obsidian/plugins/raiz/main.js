@@ -5,7 +5,7 @@
  * agenda, hábitos y gráficos. Expone su API en window.raiz para las plantillas de Templater
  * y los bloques dataviewjs.
  */
-const { Plugin, PluginSettingTab, Setting, Notice, Modal, FuzzySuggestModal, ItemView, MarkdownRenderer, MarkdownView, Menu, setIcon, getIconIds, getAllTags, requestUrl, TFile, moment } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Notice, Modal, FuzzySuggestModal, ItemView, MarkdownRenderer, MarkdownRenderChild, MarkdownView, Menu, setIcon, getIconIds, getAllTags, requestUrl, TFile, moment } = require('obsidian');
 
 // ───────────────────────────── Proveedores de IA ─────────────────────────────
 // kind "openai" = API compatible con OpenAI (/chat/completions). Los modelos son solo sugerencias:
@@ -150,6 +150,8 @@ const DEFAULT_SETTINGS = {
     covers: '06 Plantillas/Portadas',
     knowledge: '12 Conocimiento',
     wiki: '13 Wiki',
+    projects: '14 Proyectos',
+    agents: '15 Agentes',
     inbox: '00 Bandeja',
   },
 };
@@ -1255,7 +1257,7 @@ class WikiAskModal extends Modal {
 // ───────────── Botones propios de Raíz (sin depender del registro de IDs de Meta Bind) ─────────────
 // Formato, una línea por botón:  Etiqueta | abrir: ruta/de/la nota   ·   Etiqueta | comando: raiz:ai-day
 // Opcionales al final:  | icono: zap   ·   | estilo: secundario
-const ICONOS_BOTON = { '⚡': 'zap', '⭐': 'star', '🏷️': 'tag', '✨': 'sparkles', '🔎': 'search', '🎯': 'target', '💡': 'lightbulb', '🌟': 'sun', '🔭': 'telescope', '📥': 'inbox', '📅': 'calendar-plus', '🎓': 'graduation-cap', '🏋️': 'dumbbell', '➕': 'plus', '🧠': 'brain', '🔗': 'link', '🃏': 'layers' };
+const ICONOS_BOTON = { '⚡': 'zap', '⭐': 'star', '🏷️': 'tag', '✨': 'sparkles', '🔎': 'search', '🎯': 'target', '💡': 'lightbulb', '🌟': 'sun', '🔭': 'telescope', '📥': 'inbox', '📅': 'calendar-plus', '🎓': 'graduation-cap', '🏋️': 'dumbbell', '➕': 'plus', '🧠': 'brain', '🔗': 'link', '🃏': 'layers', '🤖': 'bot', '🧩': 'puzzle' };
 function lineasBotones(src) {
   const out = [];
   for (const linea of String(src).split(/\r?\n/)) {
@@ -1327,6 +1329,7 @@ module.exports = class RaizPlugin extends Plugin {
     this.loadUserFonts().then(() => this.applyFonts());
 
     this.registerMarkdownCodeBlockProcessor('raiz-botones', (src, el, ctx) => this.renderBotones(src, el, ctx));
+    this.registerMarkdownCodeBlockProcessor('raiz-agentes', (src, el, ctx) => this.renderAgentes(el, ctx));
     this.addCommand({ id: 'open-settings', name: 'Abrir ajustes', callback: () => this.openSettings() });
     this.addCommand({ id: 'check-ollama', name: 'Comprobar la IA', callback: () => this.checkAI(true) });
     this.addCommand({ id: 'wiki-ingest', name: 'Wiki: ingerir esta nota', callback: () => this.run(() => this.ingestToWiki()) });
@@ -1360,6 +1363,8 @@ module.exports = class RaizPlugin extends Plugin {
     this.addCommand({ id: 'capture', name: 'Captura rápida a la bandeja', callback: () => this.capture() });
     this.addCommand({ id: 'generate-cards', name: 'Generar preguntas de repaso de esta nota', callback: () => this.run(() => this.generateCards()) });
     this.addCommand({ id: 'new-study-page', name: 'Estudio: nueva página', callback: () => this.newStudyPage() });
+    this.addCommand({ id: 'new-project', name: 'Nuevo proyecto', callback: () => this.newProject() });
+    this.addCommand({ id: 'project-agent-snippet', name: 'Proyecto: copiar instrucciones para tu agente', callback: () => this.run(() => this.copyAgentSnippet()) });
     this.addCommand({ id: 'new-child', name: 'Página: nueva entrada dentro de la nota abierta', callback: () => this.run(() => this.newChild()) });
     this.addCommand({ id: 'insert-subpage', name: 'Insertar: nueva página enlazada aquí', editorCallback: () => this.run(() => this.insertSubpage()) });
     this.addCommand({ id: 'insert-base', name: 'Insertar: base con vistas (subpáginas)', editorCallback: () => this.run(() => this.insertChildrenBase()) });
@@ -6090,6 +6095,200 @@ module.exports = class RaizPlugin extends Plugin {
   }
   buttonRow(defs) {
     return '```raiz-botones\n' + defs.map((d) => d.block).join('\n') + '\n```';
+  }
+  // ───────────── Proyectos y agentes (memoria persistente; la herramienta boveda.js escribe aquí) ─────────────
+  newProject() {
+    new FormModal(
+      this.app,
+      '🧩 Nuevo proyecto',
+      [
+        { key: 'nombre', label: 'Nombre', required: true, placeholder: 'Ej: Tienda online' },
+        { key: 'resumen', label: 'De qué se trata', placeholder: 'Una línea' },
+        { key: 'repo', label: 'Repositorio', placeholder: 'Carpeta en tu PC o URL de GitHub' },
+        { key: 'stack', label: 'Tecnologías', placeholder: 'Separadas por coma: Next.js, Postgres' },
+        { key: 'estado', label: 'Estado', type: 'select', options: ['activo', 'idea', 'pausado', 'terminado'] },
+      ],
+      (v) => this.run(() => this.createNote(this.settings.folders.projects, v.nombre.trim(), this.projectTemplate(v)))
+    ).open();
+  }
+  /** La misma estructura que crea boveda.js (proyecto crear): así tú y tus agentes escriben en las mismas secciones. */
+  projectTemplate(v) {
+    const stack = String(v.stack || '').split(',').map((x) => x.trim()).filter(Boolean);
+    const resumen = String(v.resumen || '').trim();
+    return [
+      '---',
+      'tipo: proyecto',
+      `estado: ${v.estado || 'activo'}`,
+      `resumen: ${JSON.stringify(resumen)}`,
+      `repo: ${JSON.stringify(String(v.repo || '').trim())}`,
+      'stack:',
+      ...stack.map((x) => `  - ${JSON.stringify(x)}`),
+      `inicio: ${isoDate(moment())}`,
+      `actualizado: ${isoDate(moment())}`,
+      'tags:',
+      '  - proyecto',
+      '---',
+      `# ${v.nombre.trim()}`,
+      '```raiz-botones',
+      '🤖 Instrucciones para tu agente | comando: raiz:project-agent-snippet | estilo: secundario',
+      '```',
+      '',
+      '## Contexto',
+      resumen || '%% Qué es, para quién y por qué existe. %%',
+      '',
+      '## Estado actual',
+      '%% Qué funciona, qué falta y en qué se quedó la última sesión. Se reemplaza entero al terminar cada sesión. %%',
+      '',
+      '## Pendientes',
+      '',
+      '## Decisiones',
+      '%% Una viñeta por decisión: fecha, qué se decidió y por qué. Solo se agrega. %%',
+      '',
+      '## Aprendizajes',
+      '%% Lo que conviene recordar la próxima vez: errores, trucos, comandos. %%',
+      '',
+    ].join('\n');
+  }
+  /** Lo que se pega en el AGENTS.md o CLAUDE.md del repo: el agente sabe dónde está la memoria del proyecto, esté donde esté el vault. */
+  async copyAgentSnippet() {
+    const f = this.activeFile();
+    const nombre = f && this.fm(f).tipo === 'proyecto' ? f.basename : 'Nombre del proyecto';
+    const base = this.app.vault.adapter.getBasePath ? this.app.vault.adapter.getBasePath() : '<carpeta del vault>';
+    const bov = `${base}/${this.app.vault.configDir}/plugins/raiz/boveda.js`.replace(/\\/g, '/');
+    const txt = [
+      '## Memoria del proyecto',
+      `La memoria de este proyecto vive en mi vault de Obsidian, en la nota "${nombre}". Úsala así, sin abrir notas enteras:`,
+      `- Al empezar: \`node "${bov}" memoria contexto "<lo que vas a hacer>" --proyecto "${nombre}"\` (estado, pendientes, decisiones y lo aprendido, en ~600 tokens).`,
+      `- Al terminar: \`node "${bov}" reemplazar "${nombre}" "Estado actual" "<qué funciona, qué falta, en qué quedó>"\`.`,
+      `- Cada decisión: \`node "${bov}" agregar "${nombre}" "Decisiones" "- AAAA-MM-DD: qué y por qué"\`.`,
+      `- Lo que sirva la próxima vez (una o dos frases, nada de claves): \`node "${bov}" memoria guardar <hecho|decision|error|procedimiento> "<texto>" --proyecto "${nombre}"\`.`,
+      `- Con MCP: \`node "${bov}" mcp --perfil proyectos\`.`,
+    ].join('\n');
+    await navigator.clipboard.writeText(txt);
+    new Notice('📋 Instrucciones copiadas: pégalas en el AGENTS.md o CLAUDE.md del repo de tu proyecto.', 7000);
+    return txt;
+  }
+  async readJsonlPath(path) {
+    if (!(await this.app.vault.adapter.exists(path))) return [];
+    const out = [];
+    for (const l of (await this.app.vault.adapter.read(path)).split('\n')) {
+      if (!l.trim()) continue;
+      try {
+        out.push(JSON.parse(l));
+      } catch (e) {
+        /* una línea a medias: se lee en la próxima vuelta */
+      }
+    }
+    return out;
+  }
+  /** Panel de 15 Agentes: ejecuciones en curso (se refresca sola mientras haya una), las últimas, la memoria y los proyectos. */
+  async renderAgentes(el, ctx) {
+    const box = el.createDiv({ cls: 'raiz-agentes' });
+    const child = new MarkdownRenderChild(box);
+    ctx.addChild(child);
+    let timer = null;
+    child.onunload = () => window.clearTimeout(timer);
+    const ciclo = async () => {
+      let enCurso = 0;
+      try {
+        if (!document.hidden) enCurso = await this.drawAgentes(box);
+      } catch (e) {
+        box.empty();
+        box.createDiv({ cls: 'raiz-muted', text: `No pude leer ${this.settings.folders.agents}: ${e.message}` });
+      }
+      window.clearTimeout(timer);
+      if (box.isConnected && (enCurso || document.hidden)) timer = window.setTimeout(ciclo, 5000); // sin ejecuciones en curso no hay nada que refrescar
+    };
+    await ciclo();
+  }
+  async drawAgentes(box) {
+    const dir = this.settings.folders.agents;
+    const fmOf = (f) => this.app.metadataCache.getFileCache(f)?.frontmatter || {};
+    const runs = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => f.path.startsWith(`${dir}/Ejecuciones/`))
+      .sort((a, b) => b.basename.localeCompare(a.basename));
+    const usd = (x) => `$${Number((Number(x) || 0).toFixed(4))}`;
+    const pill = (td, estado) => {
+      const cls = { 'en curso': 'e-encurso', hecha: 'e-terminado', activo: 'e-encurso', terminado: 'e-terminado', pausado: 'e-pausado', detenida: 'e-pausado', cancelada: 'e-pausado', fallida: 'e-abandonado' }[estado] || '';
+      td.createSpan({ cls: `raiz-pill ${cls}`, text: estado || '—' });
+    };
+    // En curso: los números salen del registro, que los agentes van escribiendo
+    const vivos = [];
+    for (const f of runs.filter((r) => fmOf(r).estado === 'en curso').slice(0, 3)) {
+      const evs = await this.readJsonlPath(`${dir}/Registros/${f.basename}.jsonl`);
+      const ini = evs.find((e) => e.tipo === 'inicio') || {};
+      if (evs.some((e) => e.tipo === 'fin')) continue; // ya cerrada: la nota se actualiza al instante
+      const pasos = evs.filter((e) => e.tipo !== 'inicio');
+      const agentes = new Map();
+      for (const e of pasos) agentes.set(e.agente, e.tipo === 'agente' ? e.estado : agentes.get(e.agente) || 'running');
+      vivos.push({ f, ini, pasos, agentes, gasto: pasos.reduce((a, e) => a + (Number(e.costo_usd) || 0), 0) });
+    }
+    const mem = new Map();
+    for (const e of await this.readJsonlPath(`${dir}/Memoria/memoria.jsonl`)) {
+      if (e.id && e.texto) mem.set(e.id, { ...e, refuerzos: Number(e.refuerzos) || 0, ultimo: e.ultimo || e.ts });
+      else if (e.refuerza && mem.has(e.refuerza)) {
+        const m = mem.get(e.refuerza);
+        m.refuerzos++;
+        m.ultimo = e.ts;
+      } else if (e.olvida) mem.delete(e.olvida);
+    }
+    const proyectos = this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(`${this.settings.folders.projects}/`) && fmOf(f).tipo === 'proyecto');
+    const mes = moment().format('YYYY-MM');
+    box.empty();
+    this.kpis(box, [
+      ['Ejecuciones', runs.length, vivos.length ? `${vivos.length} en curso` : 'ninguna en curso'],
+      ['Gasto del mes', usd(runs.filter((f) => String(fmOf(f).inicio || '').startsWith(mes)).reduce((a, f) => a + (Number(fmOf(f).gasto_usd) || 0), 0) + vivos.reduce((a, v) => a + v.gasto, 0)), 'según los agentes'],
+      ['Memoria', mem.size, 'recuerdos activos'],
+      ['Proyectos', proyectos.length, `${proyectos.filter((f) => fmOf(f).estado === 'activo').length} activos`],
+    ]);
+    for (const v of vivos) {
+      this.heading(box, `En curso: ${v.ini.meta || v.f.basename}`);
+      const tope = Number(v.ini.tope_usd) || 0;
+      if (tope) {
+        const barra = box.createDiv({ cls: 'raiz-ag-barra' });
+        barra.createDiv({ cls: 'raiz-ag-barra-in' + (v.gasto >= tope ? ' is-tope' : v.gasto >= tope * 0.8 ? ' is-alto' : '') }).style.width = `${Math.min(100, (v.gasto / tope) * 100)}%`;
+      }
+      const ultimo = v.pasos[v.pasos.length - 1];
+      const quieto = ultimo && Date.now() - Date.parse(ultimo.ts) > 2 * 3600000;
+      box.createDiv({
+        cls: 'raiz-muted',
+        text: [
+          `${v.pasos.length} eventos`,
+          `${usd(v.gasto)}${tope ? ` de ${usd(tope)}` : ''}`,
+          v.ini.plazo ? `plazo ${moment(v.ini.plazo).format('HH:mm')}` : '',
+          [...v.agentes.entries()].map(([a, e]) => `${a} (${e})`).join(', '),
+          quieto ? `sin actividad desde ${moment(ultimo.ts).fromNow()}` : '',
+        ].filter(Boolean).join(' · '),
+      });
+      const log = box.createDiv({ cls: 'raiz-ag-log' });
+      for (const e of v.pasos.slice(-8)) log.createDiv({ text: `${moment(e.ts).format('HH:mm:ss')} [${e.agente}] ${e.tipo} · ${String(e.texto || '').slice(0, 140)}` });
+    }
+    if (runs.length) {
+      this.heading(box, 'Últimas ejecuciones');
+      this.table(
+        box,
+        ['Inicio', 'Meta', 'Estado', 'Gasto', 'Eventos'],
+        runs.slice(0, 10).map((f) => {
+          const fm = fmOf(f);
+          return [String(fm.inicio || '').replace('T', ' '), (td) => this.link(td, f, String(fm.meta || f.basename).slice(0, 80)), (td) => pill(td, fm.estado), usd(fm.gasto_usd), fm.eventos ?? '—'];
+        })
+      );
+    }
+    if (mem.size) {
+      this.heading(box, 'Lo que recuerdan tus agentes');
+      const ul = box.createEl('ul', { cls: 'raiz-wiki-log' });
+      const orden = [...mem.values()].sort((a, b) => b.refuerzos - a.refuerzos || String(b.ultimo).localeCompare(String(a.ultimo)));
+      for (const m of orden.slice(0, 8)) {
+        const li = ul.createEl('li');
+        li.createSpan({ cls: 'raiz-pill', text: m.tipo });
+        li.createSpan({ text: ` ${m.texto}` });
+        li.createSpan({ cls: 'raiz-muted', text: ` · ${[m.proyecto, m.agente, m.refuerzos ? `×${m.refuerzos + 1}` : ''].filter(Boolean).join(' · ')}` });
+      }
+    }
+    if (!runs.length && !mem.size)
+      box.createDiv({ cls: 'raiz-muted', text: 'Todavía no hay ejecuciones ni recuerdos. Cuando un agente use boveda (memoria guardar, ejecucion iniciar…), aparecerán aquí.' });
+    return vivos.length;
   }
   /** Dibuja una fila de botones: abren una nota o ejecutan un comando. Sin IDs que registrar, así que no se pierden. */
   renderBotones(src, el, ctx) {

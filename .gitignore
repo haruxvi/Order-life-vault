@@ -33,3 +33,9 @@
 .obsidian/plugins/raiz/.boveda-cache.json
 .obsidian/plugins/raiz/.boveda-medicion.jsonl
 .obsidian/plugins/raiz/.boveda-respaldos/
+
+# Proyectos y agentes: tu trabajo y la memoria de tus agentes son personales (se suben solo los paneles)
+14 Proyectos/*
+!14 Proyectos/Proyectos.md
+15 Agentes/*
+!15 Agentes/Agentes.md

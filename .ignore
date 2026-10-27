@@ -12,3 +12,6 @@
 *.webp
 *.gif
 *.svg
+# Registros y memoria de los agentes: se consultan con boveda (ejecucion estado, memoria contexto), no se leen en crudo
+15 Agentes/Registros/
+15 Agentes/Memoria/

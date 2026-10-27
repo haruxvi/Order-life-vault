@@ -45,13 +45,35 @@ Reglas de presupuesto:
 
 **Privacidad:** las notas con `privado: true` (o la etiqueta `privado`) no salen por la herramienta. No las abras por tu cuenta.
 
-No leas: `.obsidian/`, `.trash/`, `06 Plantillas/`, `11 Biblioteca/_portadas/` ni imágenes. Los bloques ```` ```dataviewjs ````, ```` ```base ````, ```` ```meta-bind ```` y ```` ```raiz-botones ```` son código que dibuja paneles y botones: no tienen contenido, sáltalos.
+No leas: `.obsidian/`, `.trash/`, `06 Plantillas/`, `11 Biblioteca/_portadas/`, `15 Agentes/Registros/`, `15 Agentes/Memoria/` ni imágenes. Los bloques ```` ```dataviewjs ````, ```` ```base ````, ```` ```meta-bind ````, ```` ```raiz-botones ```` y ```` ```raiz-agentes ```` son código que dibuja paneles y botones: no tienen contenido, sáltalos.
+
+## Proyectos y memoria persistente
+Para trabajar en un proyecto de desarrollo, o dentro de un sistema de varios agentes, el vault guarda lo que no conviene perder entre sesiones. Todo se consulta con presupuesto: nunca recibes más de lo que pediste.
+
+| Necesitas | Herramienta MCP | Terminal |
+|---|---|---|
+| Retomar un proyecto (estado, pendientes, decisiones y lo aprendido) | `memoria` contexto | `… boveda.js memoria contexto "tarea" --proyecto "Nombre" --presupuesto 600` |
+| Ver o crear proyectos | `proyecto` lista / ver / crear | `… boveda.js proyecto crear "Nombre" --resumen "…" --repo "…" --stack a,b` |
+| Dejar el estado al día | `reemplazar_seccion` | `… boveda.js reemplazar "Nombre" "Estado actual" "…"` |
+| Anotar una decisión o un pendiente | `agregar_a_seccion` | `… boveda.js agregar "Nombre" "Decisiones" "- AAAA-MM-DD: qué y por qué"` |
+| Guardar algo para la próxima vez | `memoria` guardar | `… boveda.js memoria guardar procedimiento "…" --proyecto "Nombre"` |
+| Descartar un recuerdo equivocado | `memoria` olvidar | `… boveda.js memoria olvidar m-xxxx "motivo"` |
+| Una ejecución de varios agentes | `ejecucion` iniciar / evento / estado / cerrar | `… boveda.js ejecucion iniciar "meta" --tope 10 --plazo 07:40` |
+
+Reglas:
+1. **Al empezar, una sola llamada a `memoria` contexto** (con `--proyecto` si es de uno). No abras la nota del proyecto entera ni leas los registros.
+2. **Al terminar, deja el proyecto al día:** reemplaza `Estado actual`, agrega a `Decisiones` y `Pendientes`.
+3. **Un recuerdo es una o dos frases que sirvan otra vez** (un procedimiento, un error y su arreglo, una preferencia de la persona), no un log de lo que hiciste. Si ya existía, la herramienta lo refuerza en vez de duplicarlo. Nunca guardes claves ni contraseñas: se rechazan.
+4. **En una ejecución de varios agentes:** el orquestador la inicia (recibe el id y el contexto previo), cada agente anota sus pasos con `ejecucion` evento y pide `memoria` contexto una vez por tarea, no en cada paso. Si una respuesta dice **DETENER** (se pasó el tope de gasto o el plazo), no sigas: cierra la ejecución.
+5. **Perfiles MCP:** cada herramienta que expones cuesta tokens en cada vuelta. Inicia el servidor con `--perfil proyectos` para trabajar en un proyecto, `--perfil agente` para un trabajador de un sistema de varios agentes y `--perfil orquestador` para quien coordina. Sin perfil quedan las herramientas de siempre.
 
 ## Qué puedes tocar
 | Carpeta | Para ti |
 |---|---|
 | `13 Wiki/` (menos `Fuentes/`) | **Escribes y mantienes** todo. |
 | `13 Wiki/Fuentes/` | Fuentes en crudo (artículos, PDFs, transcripciones). **Solo lectura**: nunca las modifiques. |
+| `14 Proyectos/` | Los proyectos de la persona: **escribes por secciones** (`agregar_a_seccion`, `reemplazar_seccion`). Si una nota tiene `revisado: true`, solo agregas. |
+| `15 Agentes/` | Ejecuciones y memoria: **solo con las herramientas `memoria` y `ejecucion`**, nunca a mano. |
 | `01 Diario` … `05 Anual`, `08 Académico`, `09 Entrenamiento`, `10 Agenda`, `11 Biblioteca`, `12 Conocimiento`, `00 Bandeja` | Escritas por la persona. **Solo lectura**: puedes citarlas como fuente, pero no las edites salvo que te lo pida. |
 | `00 Dashboard/`, `.obsidian/` | No tocar. |
 

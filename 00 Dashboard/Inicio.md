@@ -29,4 +29,4 @@ if (window.raiz) await window.raiz.charts.home(dv, this.container); else dv.para
 ```
 
 ---
-[[Panel académico|Académico]] · [[Panel de entrenamiento|Entrenamiento]] · [[Agenda]] · [[Bandeja]] · [[Biblioteca]] · [[Conocimiento]] · [[Mi espacio]] · [[Guía Raíz|Guía]]
+[[Panel académico|Académico]] · [[Panel de entrenamiento|Entrenamiento]] · [[Agenda]] · [[Bandeja]] · [[Biblioteca]] · [[Conocimiento]] · [[Proyectos]] · [[Agentes]] · [[Mi espacio]] · [[Guía Raíz|Guía]]
