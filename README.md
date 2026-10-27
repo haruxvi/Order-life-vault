@@ -66,6 +66,39 @@ También incorpora ideas de [graphify](https://github.com/Graphify-Labs/graphify
 - **Búsqueda por significado** con resguardo de RAM: mejoró 5 de 12 consultas y no empeoró ninguna.
 - **Recorrido del grafo** que no se pierde por las notas centrales.
 
+### Memoria para tus agentes y tus proyectos
+Cada sesión nueva de un agente suele partir de cero: vuelve a leer el repo, repite errores ya resueltos y gasta tokens en lo que ya se sabía. Este vault le da memoria persistente, tanto a un agente que programa contigo como a un sistema de varios agentes con un orquestador.
+
+- **`14 Proyectos`:** una nota por proyecto de desarrollo, con contexto, estado actual, pendientes, decisiones y aprendizajes. La escribes tú y también tus agentes, por secciones. El botón **Instrucciones para tu agente** copia las órdenes exactas, con la ruta de tu vault, para pegarlas en el `AGENTS.md` o `CLAUDE.md` del repo.
+- **`15 Agentes`:** cada ejecución queda con su registro (una línea por evento) y un resumen con decisiones, errores y costo por agente. Además hay una memoria que comparten todos los agentes. Un panel la muestra y se actualiza solo mientras hay una ejecución en curso.
+
+```
+orquestador  ── ejecucion iniciar ──▶  el id y lo que ya se sabe de algo parecido
+cada agente  ── memoria contexto  ──▶  solo lo que toca su tarea (≤ 600 tokens)
+cada agente  ── ejecucion evento  ──▶  "ok · 3 eventos · $0.05 de $10"  o  DETENER
+cada agente  ── memoria guardar   ──▶  un recuerdo breve; si ya existía, lo refuerza
+orquestador  ── ejecucion cerrar  ──▶  el resumen en 15 Agentes/Ejecuciones
+```
+
+Lo que se midió en las pruebas:
+
+| Prueba | Resultado |
+|---|---|
+| Retomar un proyecto | Una llamada: estado, pendientes, últimas decisiones, lo aprendido y las ejecuciones parecidas, dentro de un presupuesto (600 tokens por defecto) |
+| Memoria con 10.000 recuerdos | El contexto respeta el presupuesto y tarda ~200 ms |
+| 6 agentes anotando a la vez | 240 eventos, ninguna línea rota ni perdida |
+| Una segunda ejecución | Empezó sabiendo por qué falló la primera |
+| Lo que recibe cada agente trabajador | Entre 9 y 80 tokens por ejecución, sin contar su contexto inicial |
+| Herramientas de un trabajador (`--perfil agente`) | 5 herramientas, ~900 tokens por vuelta, frente a ~1.700 del perfil completo |
+
+- **Sirve con cualquier agente:** Hermes, un bot de Grok, Claude Code, Codex, OpenCode o tu propio orquestador en Python. Se conecta por MCP o por terminal, y los datos son markdown y JSON por líneas.
+- **Tope de gasto y plazo:** cuando se pasan, la respuesta dice **DETENER**.
+- **Nada de esto quita lo que ya hay:** sin perfil, el servidor MCP expone las mismas herramientas de siempre y cuesta lo mismo por vuelta.
+- **Privacidad:** tus proyectos y la memoria de tus agentes no se suben a GitHub, y los recuerdos que parecen claves o contraseñas se rechazan.
+- **Lo que pone el vault y lo que pones tú:** el vault aporta la memoria, el registro y el tope. La calidad de las respuestas depende del modelo y del orquestador que conectes, y `boveda` suma los costos que le informan los agentes, no ve la factura de tu proveedor.
+
+Las reglas para los agentes están en [AGENTS.md](AGENTS.md).
+
 ### Instalación
 1. Descarga o clona este repositorio y ábrelo en [Obsidian](https://obsidian.md) como vault. Necesitas una versión reciente: 1.9 o superior para las bases, y la última para el Llavero.
 2. Cuando Obsidian lo pida, activa los plugins de la comunidad.
@@ -160,6 +193,39 @@ It also takes ideas from [graphify](https://github.com/Graphify-Labs/graphify), 
 - **Lessons across sessions**, so the agent doesn't research the same thing twice.
 - **Search by meaning** with a RAM safeguard: it improved 5 of 12 queries and made none worse.
 - **Graph walking** that doesn't get lost through hub notes.
+
+### Memory for your agents and your projects
+Every new agent session tends to start from scratch: it rereads the repo, repeats mistakes that were already fixed and spends tokens on what was already known. This vault gives it persistent memory, both for an agent that codes with you and for a multi-agent system with an orchestrator.
+
+- **`14 Proyectos`:** one note per development project, with context, current status, to-dos, decisions and lessons learned. You write it and so do your agents, by section. The **Instrucciones para tu agente** button copies the exact commands, with your vault's path, to paste into the repo's `AGENTS.md` or `CLAUDE.md`.
+- **`15 Agentes`:** every run keeps its log (one line per event) and a summary with decisions, errors and cost per agent. There is also a memory shared by all your agents. A panel shows it all and refreshes itself while a run is in progress.
+
+```
+orchestrator ── ejecucion iniciar ──▶  the run id and what's already known about similar work
+each agent   ── memoria contexto  ──▶  only what its task needs (≤ 600 tokens)
+each agent   ── ejecucion evento  ──▶  "ok · 3 eventos · $0.05 de $10"  or  DETENER (stop)
+each agent   ── memoria guardar   ──▶  a short memory; if it already existed, it gets reinforced
+orchestrator ── ejecucion cerrar  ──▶  the summary in 15 Agentes/Ejecuciones
+```
+
+What the tests measured:
+
+| Test | Result |
+|---|---|
+| Picking up a project | One call: status, to-dos, latest decisions, lessons and similar runs, within a budget (600 tokens by default) |
+| Memory with 10,000 entries | The context stays within budget and takes ~200 ms |
+| 6 agents logging at the same time | 240 events, no broken or lost lines |
+| A second run | It started out knowing why the first one failed |
+| What each worker agent receives | Between 9 and 80 tokens per run, not counting its initial context |
+| A worker's tools (`--perfil agente`) | 5 tools, ~900 tokens per turn, versus ~1,700 for the full profile |
+
+- **Works with any agent:** Hermes, a Grok bot, Claude Code, Codex, OpenCode or your own Python orchestrator. It connects over MCP or the command line, and the data is plain markdown and JSON lines.
+- **Spending cap and deadline:** once either is passed, the answer says **DETENER** (stop).
+- **Nothing existing is lost:** without a profile, the MCP server exposes the same tools as before and costs the same per turn.
+- **Privacy:** your projects and your agents' memory are not uploaded to GitHub, and memories that look like keys or passwords are rejected.
+- **What the vault provides and what you provide:** the vault brings the memory, the log and the cap. Answer quality depends on the model and the orchestrator you connect, and `boveda` adds up the costs your agents report; it can't see your provider's bill.
+
+The rules for agents are in [AGENTS.md](AGENTS.md).
 
 ### Getting started
 1. Download or clone this repository and open it in [Obsidian](https://obsidian.md) as a vault. Use a recent version: 1.9 or later for databases, and the latest one for the keychain.
